@@ -178,22 +178,51 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           
-          <Card className="col-span-3 border-slate-200 shadow-sm bg-slate-900 text-white">
+          <Card className="col-span-3 border-slate-200 shadow-sm bg-slate-900 text-white overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
             <CardHeader>
-              <CardTitle className="text-white">Acciones Rápidas</CardTitle>
+              <CardTitle className="text-white flex items-center gap-2">
+                <div className="w-2 h-6 bg-blue-500 rounded-full"></div>
+                Acciones Rápidas
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 relative z-10">
               <Link href="/attendance">
-                <Button className="w-full justify-start bg-blue-600 hover:bg-blue-700 text-white mb-3">
-                  <CalendarCheck className="mr-2 h-4 w-4" />
-                  Tomar Asistencia Hoy
-                </Button>
+                <button className="w-full group relative flex items-center justify-between p-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all duration-200 shadow-[0_4px_0_rgb(29,78,216)] hover:shadow-[0_2px_0_rgb(29,78,216)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-700/50 rounded-lg group-hover:bg-blue-600/50 transition-colors">
+                      <CalendarCheck className="h-6 w-6" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-sm">Tomar Asistencia</p>
+                      <p className="text-xs text-blue-100">Registrar presentes hoy</p>
+                    </div>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </div>
+                  </div>
+                </button>
               </Link>
+              
               <Link href="/payments">
-                <Button variant="outline" className="w-full justify-start border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Registrar Pagos
-                </Button>
+                <button className="w-full group relative flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all duration-200 shadow-[0_4px_0_rgb(15,23,42)] hover:shadow-[0_2px_0_rgb(15,23,42)] hover:translate-y-[2px] active:shadow-none active:translate-y-[4px] border border-slate-700">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-900/50 rounded-lg group-hover:bg-slate-800/50 transition-colors">
+                      <CreditCard className="h-6 w-6 text-emerald-400" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold text-sm">Registrar Pagos</p>
+                      <p className="text-xs text-slate-400">Gestionar sueldos</p>
+                    </div>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </div>
+                  </div>
+                </button>
               </Link>
             </CardContent>
           </Card>
