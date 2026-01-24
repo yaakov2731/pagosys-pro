@@ -26,12 +26,18 @@ export default function Layout({ children }: LayoutProps) {
     <div className="flex flex-col h-full bg-slate-900 text-white">
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-3 font-bold text-2xl tracking-tight">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-900/20">
-            <img src="/logo.png" alt="Docks Logo" className="w-full h-full object-contain p-1" />
+          <div className="w-10 h-10 grid grid-cols-2 gap-0.5 rounded-lg overflow-hidden shrink-0">
+            <div className="bg-[#f97316]"></div> {/* Orange */}
+            <div className="bg-[#16a34a]"></div> {/* Green */}
+            <div className="bg-[#eab308]"></div> {/* Yellow */}
+            <div className="bg-[#3b82f6]"></div> {/* Blue */}
           </div>
-          <span>DOCKS PRO</span>
+          <div className="flex flex-col">
+            <span className="leading-none">DOCKS</span>
+            <span className="text-sm font-normal text-slate-400 leading-none">DEL PUERTO</span>
+          </div>
         </div>
-        <p className="text-xs text-slate-400 mt-2 ml-[3.25rem]">Control Operativo</p>
+        <p className="text-[10px] uppercase tracking-wider text-slate-500 mt-4 font-medium">Control Operativo</p>
       </div>
       
       <nav className="flex-1 p-4 space-y-1">
@@ -75,8 +81,11 @@ export default function Layout({ children }: LayoutProps) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 z-40 flex items-center px-4 justify-between border-b border-slate-800">
         <div className="flex items-center gap-3 font-bold text-white text-lg">
-          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-md">
-            <img src="/logo.png" alt="Docks Logo" className="w-full h-full object-contain p-1" />
+          <div className="w-8 h-8 grid grid-cols-2 gap-0.5 rounded overflow-hidden shrink-0">
+            <div className="bg-[#f97316]"></div>
+            <div className="bg-[#16a34a]"></div>
+            <div className="bg-[#eab308]"></div>
+            <div className="bg-[#3b82f6]"></div>
           </div>
           <span>DOCKS PRO</span>
         </div>
