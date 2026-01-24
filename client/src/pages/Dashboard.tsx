@@ -2,8 +2,8 @@
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
-import { formatCurrency, getCurrentDateISO } from "@/lib/utils";
-import { Building2, CalendarCheck, CreditCard, Users } from "lucide-react";
+import { formatCurrency, getCurrentDateISO, checkConsecutiveAbsences } from "@/lib/utils";
+import { Building2, CalendarCheck, CreditCard, Users, AlertTriangle } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,40 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          {/* Alerts Section */}
+          {employees.some(e => checkConsecutiveAbsences(e.id, attendance)) && (
+            <Card className="col-span-full border-red-200 bg-red-50 shadow-sm mb-6">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="w-5 h-5" />
+                  Alertas de Asistencia
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {employees
+                    .filter(e => checkConsecutiveAbsences(e.id, attendance))
+                    .map(e => (
+                      <div key={e.id} className="flex items-center justify-between bg-white p-3 rounded-md border border-red-100 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-xs">
+                            {e.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-900">{e.name}</p>
+                            <p className="text-xs text-slate-500">{locations.find(l => l.id === e.locationId)?.name}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-100">
+                          3+ Faltas
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="col-span-4 border-slate-200 shadow-sm">
             <CardHeader>
               <CardTitle>Resumen por Local</CardTitle>

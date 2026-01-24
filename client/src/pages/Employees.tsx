@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, checkConsecutiveAbsences } from "@/lib/utils";
+import { AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, User } from "lucide-react";
 import { useState } from "react";
 
 export default function Employees() {
-  const { employees, locations } = useStore();
+  const { employees, locations, attendance } = useStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
 
@@ -80,9 +82,21 @@ export default function Employees() {
                   </div>
                   <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
                     <span className="text-slate-500">Estado</span>
-                    <Badge variant={employee.active ? "default" : "secondary"} className={employee.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : ""}>
-                      {employee.active ? "Activo" : "Inactivo"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {checkConsecutiveAbsences(employee.id, attendance) && (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <AlertTriangle className="w-5 h-5 text-red-500 animate-pulse" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Alerta: 3+ inasistencias consecutivas</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Badge variant={employee.active ? "default" : "secondary"} className={employee.active ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : ""}>
+                        {employee.active ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </CardContent>

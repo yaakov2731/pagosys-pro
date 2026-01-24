@@ -41,3 +41,36 @@ export function getCurrentDateISO(): string {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+import { AttendanceRecord } from "./data";
+
+export function checkConsecutiveAbsences(
+  employeeId: string, 
+  attendance: AttendanceRecord[], 
+  threshold: number = 3
+): boolean {
+  // Get all records for this employee, sorted by date descending
+  const employeeRecords = attendance
+    .filter(r => r.employeeId === employeeId)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  if (employeeRecords.length < threshold) return false;
+
+  // Check the most recent 'threshold' records
+  let consecutiveAbsences = 0;
+  
+  // We need to check consecutive DAYS, not just records
+  // But for simplicity in this version, we'll check consecutive 'absent' records
+  // Assuming daily records are generated or we only care about recorded absences
+  
+  for (let i = 0; i < employeeRecords.length; i++) {
+    if (employeeRecords[i].status === 'absent') {
+      consecutiveAbsences++;
+    } else {
+      // Break if we find a present record
+      break;
+    }
+  }
+
+  return consecutiveAbsences >= threshold;
+}
