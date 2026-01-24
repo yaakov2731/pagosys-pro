@@ -3,13 +3,25 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { formatCurrency, getCurrentDateISO, checkConsecutiveAbsences } from "@/lib/utils";
-import { Building2, CalendarCheck, CreditCard, Users, AlertTriangle } from "lucide-react";
+import { Building2, CalendarCheck, CreditCard, Users, AlertTriangle, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 export default function Dashboard() {
-  const { employees, locations, attendance, payments } = useStore();
+  const { employees, locations, attendance, payments, resetData } = useStore();
   const currentDate = getCurrentDateISO();
   const currentMonth = currentDate.substring(0, 7);
 
@@ -36,9 +48,41 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 mt-2">Vista general del estado operativo de hoy.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
+            <p className="text-slate-500 mt-2">Vista general del estado operativo de hoy.</p>
+          </div>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" className="gap-2">
+                <Trash2 className="w-4 h-4" />
+                Limpiar Datos
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción borrará permanentemente todo el historial de asistencia y pagos registrados.
+                  Los empleados y locales se mantendrán. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => {
+                    resetData();
+                    toast.success("Datos eliminados correctamente");
+                  }}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Sí, borrar todo
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
