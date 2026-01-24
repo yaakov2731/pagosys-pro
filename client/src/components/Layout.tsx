@@ -26,8 +26,8 @@ export default function Layout({ children }: LayoutProps) {
     <div className="flex flex-col h-full bg-slate-900 text-white">
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Home className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="Docks Logo" className="w-full h-full object-contain p-1" />
           </div>
           <span>DOCKS PRO</span>
         </div>
@@ -75,8 +75,8 @@ export default function Layout({ children }: LayoutProps) {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 z-40 flex items-center px-4 justify-between border-b border-slate-800">
         <div className="flex items-center gap-2 font-bold text-white">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Home className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="Docks Logo" className="w-full h-full object-contain p-1" />
           </div>
           <span>DOCKS PRO</span>
         </div>

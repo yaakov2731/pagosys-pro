@@ -3,7 +3,9 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { formatCurrency, getCurrentDateISO } from "@/lib/utils";
-import { BarChart, PieChart } from "lucide-react";
+import { BarChart, PieChart, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 import { useMemo } from "react";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Legend, Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -59,8 +61,18 @@ export default function Reports() {
     <Layout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Reportes</h1>
-          <p className="text-slate-500 mt-2">Análisis de costos y asistencia del mes actual ({currentMonth}).</p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Reportes</h1>
+              <p className="text-slate-500 mt-2">Análisis de costos y asistencia del mes actual ({currentMonth}).</p>
+            </div>
+            <Link href={`/print-report?month=${currentMonth}`}>
+              <Button className="bg-slate-900 text-white hover:bg-slate-800">
+                <Printer className="w-4 h-4 mr-2" />
+                Imprimir Reporte A4
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">

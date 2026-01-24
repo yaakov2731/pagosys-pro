@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Employees from "./pages/Employees";
 import Payments from "./pages/Payments";
 import Reports from "./pages/Reports";
+import PrintReport from "./pages/PrintReport";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/payments" component={Payments} />
       <Route path="/employees" component={Employees} />
       <Route path="/reports" component={Reports} />
+      <Route path="/print-report" component={PrintReport} />
       <Route component={NotFound} />
     </Switch>
   );
