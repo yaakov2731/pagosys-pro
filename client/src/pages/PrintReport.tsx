@@ -37,6 +37,16 @@ export default function PrintReport() {
     .filter(e => e.active && (locationId === "all" || e.locationId === locationId))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Calculate dynamic date range
+  const allDates = attendance
+    .filter(r => r.date.startsWith(month) && r.status === 'present')
+    .map(r => r.date)
+    .sort();
+  
+  const startDate = allDates.length > 0 ? formatDate(allDates[0]) : formatDate(`${month}-01`);
+  const endDate = formatDate(getCurrentDateISO());
+  const periodString = `${startDate} - ${endDate}`;
+
   // Process data per employee
   const employeeData = activeEmployees.map(employee => {
     const monthlyAttendance = attendance.filter(
@@ -136,8 +146,8 @@ export default function PrintReport() {
       
       // 2. Open Email Client
       setTimeout(() => {
-        const subject = `Reporte de Pagos - ${month}`;
-        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${month}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Extras: ${formatCurrency(globalTotals.extras)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
+        const subject = `Reporte de Pagos - ${periodString}`;
+        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${periodString}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Extras: ${formatCurrency(globalTotals.extras)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
         
         window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         
@@ -219,7 +229,7 @@ export default function PrintReport() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold">PERÍODO: {month}</p>
+                <p className="text-sm font-bold">PERÍODO: {periodString}</p>
                 <p className="text-[10px] text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
               </div>
             </div>
@@ -290,7 +300,7 @@ export default function PrintReport() {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold">PERÍODO: {month}</p>
+                <p className="text-sm font-bold">PERÍODO: {periodString}</p>
                 <p className="text-[10px] text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
               </div>
             </div>
