@@ -115,37 +115,49 @@ export default function PrintReport() {
     </div>
   );
 
-  const handleDownloadPDF = async () => {
-    setIsSending(true);
+  const generateEmailText = () => {
+    let text = `REPORTE DE PAGOS - PERÍODO: ${periodString}\n`;
+    text += `Generado: ${formatDate(getCurrentDateISO())}\n\n`;
     
-    try {
-      // Dynamic import to fix SSR/build issues
-      // @ts-ignore
-      const html2pdf = (await import("html2pdf.js")).default;
+    text += `RESUMEN GLOBAL\n`;
+    text += `Total a Pagar: ${formatCurrency(globalTotals.earned)}\n`;
+    text += `Total Extras: ${formatCurrency(globalTotals.extras)}\n`;
+    text += `Total Pagado: ${formatCurrency(globalTotals.paid)}\n`;
+    text += `Saldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\n`;
+    text += `----------------------------------------\n\n`;
 
-      // 1. Generate PDF
-      const element = reportRef.current;
-      if (!element) return;
-
-      const opt = {
-        margin: 5,
-        filename: `Reporte_Pagos_${month}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const }
-      };
-
-      await html2pdf().set(opt).from(element).save();
+    groupedData.forEach(group => {
+      if (!group) return;
+      text += `LOCAL: ${group.location.name}\n`;
+      text += `Empleados: ${group.employees.length}\n`;
+      text += `Total Pagado: ${formatCurrency(group.totals.paid)}\n`;
+      text += `Pendiente: ${formatCurrency(group.totals.pending)}\n\n`;
       
-      setIsSending(false);
-      setIsEmailOpen(false);
-      toast.success("PDF descargado. Ahora puedes adjuntarlo a tu correo.");
+      text += `DETALLE POR EMPLEADO:\n`;
+      group.employees.forEach(d => {
+        text += `- ${d.employee.name}: ${formatCurrency(d.totalPaid)} pagado`;
+        if (d.pendingAmount > 0) text += ` (Pendiente: ${formatCurrency(d.pendingAmount)})`;
+        if (d.totalExtras > 0) text += ` [Incluye ${formatCurrency(d.totalExtras)} extras]`;
+        text += `\n`;
+      });
+      text += `\n----------------------------------------\n\n`;
+    });
 
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al generar el PDF: " + (error as Error).message);
-      setIsSending(false);
-    }
+    return text;
+  };
+
+  const handleCopyEmail = () => {
+    const text = generateEmailText();
+    navigator.clipboard.writeText(text);
+    toast.success("Resumen copiado al portapapeles");
+    setIsEmailOpen(false);
+  };
+
+  const handleOpenMailClient = () => {
+    const subject = `Reporte de Pagos - ${periodString}`;
+    const body = encodeURIComponent(generateEmailText());
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+    setIsEmailOpen(false);
   };
 
   return (
@@ -161,19 +173,27 @@ export default function PrintReport() {
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 border-slate-300">
                 <Mail className="w-4 h-4" />
-                Descargar PDF para Email
+                Enviar Resumen por Email
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Descargar Reporte PDF</DialogTitle>
+                <DialogTitle>Resumen para Email</DialogTitle>
                 <DialogDescription>
-                  El sistema descargará el PDF completo en tu computadora. Luego podrás adjuntarlo manualmente a tu correo.
+                  Copia este resumen de texto o abre tu cliente de correo directamente.
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter>
-                <Button onClick={handleDownloadPDF} disabled={isSending}>
-                  {isSending ? "Generando PDF..." : "Descargar PDF"}
+              
+              <div className="p-4 bg-slate-50 rounded-md border border-slate-200 max-h-[300px] overflow-y-auto text-xs font-mono whitespace-pre-wrap">
+                {generateEmailText()}
+              </div>
+
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={handleCopyEmail} className="w-full sm:w-auto">
+                  Copiar Texto
+                </Button>
+                <Button onClick={handleOpenMailClient} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+                  Abrir Correo
                 </Button>
               </DialogFooter>
             </DialogContent>

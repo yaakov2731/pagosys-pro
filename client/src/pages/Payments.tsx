@@ -303,22 +303,43 @@ export default function Payments() {
             </DialogHeader>
             
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Jornal</Label>
-                <div className="col-span-3 font-bold text-slate-900">
-                  {selectedPayment && formatCurrency(selectedPayment.amount)}
+              <div className="p-4 bg-slate-50 rounded-lg border border-slate-100 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-500">Jornal Base</span>
+                  <span className="font-bold text-slate-900">{selectedPayment && formatCurrency(selectedPayment.amount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-500">Extras</span>
+                  <span className="font-bold text-blue-600">
+                    + {formatCurrency(Number(extrasAmount) || 0)}
+                  </span>
+                </div>
+                <div className="pt-3 border-t border-slate-200 flex justify-between items-center">
+                  <span className="font-bold text-slate-900">Total a Pagar</span>
+                  <span className="font-bold text-lg text-emerald-700">
+                    {selectedPayment && formatCurrency(selectedPayment.amount + (Number(extrasAmount) || 0))}
+                  </span>
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="extras" className="text-right">Extras ($)</Label>
-                <Input
-                  id="extras"
-                  type="number"
-                  value={extrasAmount}
-                  onChange={(e) => setExtrasAmount(e.target.value)}
-                  className="col-span-3"
-                  placeholder="0"
-                />
+
+              <div className="space-y-2">
+                <Label htmlFor="extras" className="text-sm font-medium text-slate-700">
+                  Agregar Horas Extras / Bonos ($)
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <Input
+                    id="extras"
+                    type="number"
+                    value={extrasAmount}
+                    onChange={(e) => setExtrasAmount(e.target.value)}
+                    className="pl-7 bg-white"
+                    placeholder="0"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Ingrese el monto adicional a pagar por horas extras o premios.
+                </p>
               </div>
             </div>
 
