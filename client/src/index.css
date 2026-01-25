@@ -176,3 +176,30 @@
     }
   }
 }
+@media print {
+  @page {
+    margin: 0;
+    size: landscape;
+  }
+  
+  /* Hide browser default headers/footers */
+  body {
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide Manus badge and other UI elements */
+  #manus-badge, 
+  [class*="manus-badge"],
+  iframe[style*="z-index: 2147483647"] {
+    display: none !important;
+  }
+}
+
+/* Hide Manus badge globally */
+#manus-badge, 
+[class*="manus-badge"],
+iframe[style*="z-index: 2147483647"] {
+  display: none !important;
+}
