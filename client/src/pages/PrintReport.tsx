@@ -17,8 +17,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-// @ts-ignore
-import html2pdf from "html2pdf.js";
 
 export default function PrintReport() {
   const [email, setEmail] = useState("");
@@ -118,6 +116,10 @@ export default function PrintReport() {
     setIsSending(true);
     
     try {
+      // Dynamic import to fix SSR/build issues
+      // @ts-ignore
+      const html2pdf = (await import("html2pdf.js")).default;
+
       // 1. Generate PDF
       const element = reportRef.current;
       if (!element) return;
@@ -146,7 +148,7 @@ export default function PrintReport() {
 
     } catch (error) {
       console.error(error);
-      toast.error("Error al generar el PDF");
+      toast.error("Error al generar el PDF: " + (error as Error).message);
       setIsSending(false);
     }
   };
