@@ -6,15 +6,36 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, checkConsecutiveAbsences } from "@/lib/utils";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Pencil } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, User } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Employee } from "@/lib/data";
 
 export default function Employees() {
-  const { employees, locations, attendance } = useStore();
+  const { employees, locations, attendance, updateEmployee } = useStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  
+  // Edit Dialog State
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editForm, setEditForm] = useState({
+    dailyRate: "",
+    role: "",
+    active: true
+  });
 
   const filteredEmployees = employees.filter(e => {
     const matchesSearch = e.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -22,6 +43,29 @@ export default function Employees() {
     const matchesLocation = selectedLocation === "all" || e.locationId === selectedLocation;
     return matchesSearch && matchesLocation;
   });
+
+  const handleEditClick = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setEditForm({
+      dailyRate: employee.dailyRate.toString(),
+      role: employee.role,
+      active: employee.active
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingEmployee) return;
+
+    updateEmployee(editingEmployee.id, {
+      dailyRate: Number(editForm.dailyRate),
+      role: editForm.role,
+      active: editForm.active
+    });
+
+    toast.success("Empleado actualizado correctamente");
+    setIsEditDialogOpen(false);
+  };
 
   return (
     <Layout>
@@ -58,7 +102,17 @@ export default function Employees() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredEmployees.map(employee => (
-            <Card key={employee.id} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <Card key={employee.id} className="border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
+              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                  onClick={() => handleEditClick(employee)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </div>
               <CardHeader className="flex flex-row items-center gap-4 pb-2">
                 <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
                   <User className="w-6 h-6 text-slate-500" />
@@ -109,6 +163,69 @@ export default function Employees() {
             <p className="text-slate-500">No se encontraron empleados.</p>
           </div>
         )}
+
+        {/* Edit Employee Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Empleado</DialogTitle>
+              <DialogDescription>
+                Modificar datos para {editingEmployee?.name}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="role">Rol / Puesto</Label>
+                <Input
+                  id="role"
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="dailyRate">Jornal Diario ($)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <Input
+                    id="dailyRate"
+                    type="number"
+                    className="pl-7"
+                    value={editForm.dailyRate}
+                    onChange={(e) => setEditForm({ ...editForm, dailyRate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Estado Activo</Label>
+                  <p className="text-xs text-slate-500">
+                    Desactivar si el empleado ya no trabaja aquí
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant={editForm.active ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setEditForm({ ...editForm, active: !editForm.active })}
+                    className={editForm.active ? "bg-emerald-600 hover:bg-emerald-700" : "text-slate-500"}
+                  >
+                    {editForm.active ? "Activo" : "Inactivo"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveEdit} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
