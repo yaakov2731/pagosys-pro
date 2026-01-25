@@ -10,21 +10,26 @@ import { useMemo } from "react";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Legend, Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 export default function Reports() {
-  const { employees, locations, attendance, payments } = useStore();
+  const { employees, locations, attendance, payments, extras } = useStore();
   const currentMonth = getCurrentDateISO().substring(0, 7);
 
   const costsByLocation = useMemo(() => {
     return locations.filter(l => l.active).map(location => {
       const locationEmployees = employees.filter(e => e.locationId === location.id);
       
-      // Calculate total cost for this month (based on attendance)
+      // Calculate total cost for this month (based on attendance + extras)
       const totalCost = locationEmployees.reduce((sum, emp) => {
         const daysWorked = attendance.filter(
           r => r.employeeId === emp.id && 
           r.date.startsWith(currentMonth) && 
           r.status === 'present'
         ).length;
-        return sum + (daysWorked * emp.dailyRate);
+        
+        const employeeExtras = extras.filter(
+          e => e.employeeId === emp.id && e.period === currentMonth
+        ).reduce((acc, curr) => acc + curr.amount, 0);
+
+        return sum + (daysWorked * emp.dailyRate) + employeeExtras;
       }, 0);
 
       return {

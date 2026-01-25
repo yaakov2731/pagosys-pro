@@ -21,7 +21,7 @@ export default function PrintReport() {
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   
-    const { employees, locations, attendance, payments, advances } = useStore();
+    const { employees, locations, attendance, payments, advances, extras } = useStore();
   const [location] = useLocation();
   
   // Extract params from URL
@@ -62,13 +62,20 @@ export default function PrintReport() {
       a => a.employeeId === employee.id && a.period === month
     );
 
+    const monthlyExtras = extras.filter(
+      e => e.employeeId === employee.id && e.period === month
+    );
+
     const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
-    const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+    const totalPaidExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
     const totalAdvances = monthlyAdvances.reduce((sum, a) => sum + a.amount, 0);
-    const totalPaid = totalPaidBase + totalExtras;
+    const totalRegisteredExtras = monthlyExtras.reduce((sum, e) => sum + e.amount, 0);
     
-    // Pending = Earned - PaidBase - Advances
-    const pendingAmount = totalEarned - totalPaidBase - totalAdvances;
+    const totalPaid = totalPaidBase + totalPaidExtras;
+    const totalExtras = totalPaidExtras + totalRegisteredExtras;
+    
+    // Pending = Earned + RegisteredExtras - PaidBase - Advances
+    const pendingAmount = totalEarned + totalRegisteredExtras - totalPaidBase - totalAdvances;
 
     return {
       employee,
