@@ -14,7 +14,7 @@ export default function Reports() {
   const currentMonth = getCurrentDateISO().substring(0, 7);
 
   const costsByLocation = useMemo(() => {
-    return locations.map(location => {
+    return locations.filter(l => l.active).map(location => {
       const locationEmployees = employees.filter(e => e.locationId === location.id);
       
       // Calculate total cost for this month (based on attendance)
@@ -35,7 +35,7 @@ export default function Reports() {
   }, [employees, locations, attendance, currentMonth]);
 
   const attendanceByLocation = useMemo(() => {
-    return locations.map(location => {
+    return locations.filter(l => l.active).map(location => {
       const locationEmployees = employees.filter(e => e.locationId === location.id);
       
       const totalDays = locationEmployees.length * 30; // Approx

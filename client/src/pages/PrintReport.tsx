@@ -77,7 +77,7 @@ export default function PrintReport() {
 
   // Group by location
   const groupedData = locations
-    .filter(loc => locationId === "all" || loc.id === locationId)
+    .filter(loc => loc.active && (locationId === "all" || loc.id === locationId))
     .map(loc => {
       const locEmployees = employeeData.filter(d => d.employee.locationId === loc.id);
       if (locEmployees.length === 0) return null;

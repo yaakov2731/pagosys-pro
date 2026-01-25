@@ -3,7 +3,7 @@ import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { formatCurrency, getCurrentDateISO, checkConsecutiveAbsences } from "@/lib/utils";
-import { Building2, CalendarCheck, CreditCard, Users, AlertTriangle, Trash2 } from "lucide-react";
+import { Building2, CalendarCheck, CreditCard, Users, AlertTriangle, Trash2, Settings2, Power } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function Dashboard() {
-  const { employees, locations, attendance, payments, resetData } = useStore();
+  const { employees, locations, attendance, payments, resetData, toggleLocation } = useStore();
   const currentDate = getCurrentDateISO();
   const currentMonth = currentDate.substring(0, 7);
 
@@ -54,35 +64,82 @@ export default function Dashboard() {
             <p className="text-slate-500 mt-2">Vista general del estado operativo de hoy.</p>
           </div>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="gap-2">
-                <Trash2 className="w-4 h-4" />
-                Limpiar Datos
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta acción borrará permanentemente todo el historial de asistencia y pagos registrados.
-                  Los empleados y locales se mantendrán. Esta acción no se puede deshacer.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={() => {
-                    resetData();
-                    toast.success("Datos eliminados correctamente");
-                  }}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Sí, borrar todo
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <div className="flex gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Gestionar Locales
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Gestión de Locales</DialogTitle>
+                  <DialogDescription>
+                    Activa o desactiva locales. Los locales desactivados no aparecerán en el dashboard ni en los reportes.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  {locations.map((location) => (
+                    <div key={location.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                          location.active 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          {location.name.substring(0, 2)}
+                        </div>
+                        <span className={`font-medium ${!location.active && 'text-slate-400'}`}>
+                          {location.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor={`switch-${location.id}`} className="text-xs text-slate-500">
+                          {location.active ? 'Activo' : 'Inactivo'}
+                        </Label>
+                        <Switch
+                          id={`switch-${location.id}`}
+                          checked={location.active}
+                          onCheckedChange={() => toggleLocation(location.id)}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" className="gap-2">
+                  <Trash2 className="w-4 h-4" />
+                  Limpiar Datos
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción borrará permanentemente todo el historial de asistencia y pagos registrados.
+                    Los empleados y locales se mantendrán. Esta acción no se puede deshacer.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => {
+                      resetData();
+                      toast.success("Datos eliminados correctamente");
+                    }}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Sí, borrar todo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -192,7 +249,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {locations.map(location => {
+                {locations.filter(l => l.active).map(location => {
                   const employeesInLocation = employees.filter(e => e.locationId === location.id).length;
                   const presentInLocation = attendance.filter(
                     r => r.date === currentDate && 
@@ -218,6 +275,12 @@ export default function Dashboard() {
                     </div>
                   );
                 })}
+                {locations.filter(l => l.active).length === 0 && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Building2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                    <p>No hay locales activos</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

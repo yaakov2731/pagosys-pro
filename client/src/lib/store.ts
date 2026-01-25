@@ -10,6 +10,7 @@ interface AppState {
   payments: PaymentRecord[];
   
   // Actions
+  toggleLocation: (locationId: string) => void;
   addAttendance: (record: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
   removeAttendance: (employeeId: string, date: string) => void;
   markPaid: (employeeId: string, date: string, amount: number, extras?: number) => void;
@@ -27,6 +28,14 @@ export const useStore = create<AppState>()(
       locations: LOCATIONS,
       attendance: [],
       payments: [],
+
+      toggleLocation: (locationId) => {
+        set((state) => ({
+          locations: state.locations.map((l) =>
+            l.id === locationId ? { ...l, active: !l.active } : l
+          ),
+        }));
+      },
 
       addAttendance: (record) => {
         set((state) => {

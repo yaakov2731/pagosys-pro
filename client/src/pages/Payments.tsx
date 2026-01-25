@@ -143,12 +143,12 @@ export default function Payments() {
               <SelectTrigger className="w-full sm:w-48 bg-white">
                 <SelectValue placeholder="Filtrar por local" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los locales</SelectItem>
-                {locations.map(l => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                ))}
-              </SelectContent>
+                <SelectContent>
+                  <SelectItem value="all">Todos los locales</SelectItem>
+                  {locations.filter(l => l.active).map(l => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
             </Select>
             <Select value={paymentStatus} onValueChange={setPaymentStatus}>
               <SelectTrigger className="w-full sm:w-48 bg-white">
