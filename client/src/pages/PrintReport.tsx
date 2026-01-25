@@ -2,8 +2,8 @@
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
 import { useLocation } from "wouter";
-import { Mail, Printer, Send } from "lucide-react";
-import { useState } from "react";
+import { Mail, Printer, Download } from "lucide-react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -17,11 +17,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+// @ts-ignore
+import html2pdf from "html2pdf.js";
 
 export default function PrintReport() {
   const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+  
   const { employees, locations, attendance, payments } = useStore();
   const [location] = useLocation();
   
@@ -90,13 +94,54 @@ export default function PrintReport() {
   }), { earned: 0, paid: 0, pending: 0 });
 
   const Logo = () => (
-    <div className="w-12 h-12 grid grid-cols-2 gap-0.5 rounded-lg overflow-hidden shrink-0 print:border print:border-slate-200">
+    <div className="w-8 h-8 grid grid-cols-2 gap-0.5 rounded overflow-hidden shrink-0 print:border print:border-slate-200">
       <div className="bg-[#f97316] print:bg-slate-800"></div>
       <div className="bg-[#16a34a] print:bg-slate-600"></div>
       <div className="bg-[#eab308] print:bg-slate-400"></div>
       <div className="bg-[#3b82f6] print:bg-slate-900"></div>
     </div>
   );
+
+  const handleSendEmail = async () => {
+    if (!email) {
+      toast.error("Ingresa un email válido");
+      return;
+    }
+    setIsSending(true);
+    
+    try {
+      // 1. Generate PDF
+      const element = reportRef.current;
+      if (!element) return;
+
+      const opt = {
+        margin: 10,
+        filename: `Reporte_Pagos_${month}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+      
+      // 2. Open Email Client
+      setTimeout(() => {
+        const subject = `Reporte de Pagos - ${month}`;
+        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${month}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
+        
+        window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        setIsSending(false);
+        setIsEmailOpen(false);
+        toast.success("PDF descargado. Adjúntalo al correo abierto.");
+      }, 1500);
+
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al generar el PDF");
+      setIsSending(false);
+    }
+  };
 
   return (
     <div className="bg-white min-h-screen p-8 print:p-0 font-sans text-slate-900">
@@ -118,7 +163,7 @@ export default function PrintReport() {
               <DialogHeader>
                 <DialogTitle>Enviar Reporte por Email</DialogTitle>
                 <DialogDescription>
-                  Se abrirá tu cliente de correo con un resumen del reporte listo para enviar.
+                  El sistema descargará el PDF completo y abrirá tu correo para que lo adjuntes.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -133,29 +178,8 @@ export default function PrintReport() {
                 </div>
               </div>
               <DialogFooter>
-                <Button 
-                  onClick={() => {
-                    if (!email) {
-                      toast.error("Ingresa un email válido");
-                      return;
-                    }
-                    setIsSending(true);
-                    
-                    // Simulate sending delay
-                    setTimeout(() => {
-                      const subject = `Reporte de Pagos - ${month}`;
-                      const body = `Adjunto el reporte de pagos del período ${month}.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
-                      
-                      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                      
-                      setIsSending(false);
-                      setIsEmailOpen(false);
-                      toast.success("Cliente de correo abierto");
-                    }, 1000);
-                  }} 
-                  disabled={isSending}
-                >
-                  {isSending ? "Abriendo..." : "Redactar Correo"}
+                <Button onClick={handleSendEmail} disabled={isSending}>
+                  {isSending ? "Generando PDF..." : "Descargar y Redactar"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -171,149 +195,152 @@ export default function PrintReport() {
         </div>
       </div>
 
-      {/* SUMMARY PAGE (Only if viewing ALL locations) */}
-      {locationId === "all" && (
-        <div className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col">
-          <div className="flex justify-between items-start mb-12 border-b-2 border-slate-900 pb-6">
-            <div className="flex items-center gap-4">
-              <Logo />
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight uppercase">Resumen Ejecutivo</h1>
-                <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">Docks del Puerto • Gerencia</p>
+      {/* REPORT CONTENT */}
+      <div ref={reportRef}>
+        {/* SUMMARY PAGE (Only if viewing ALL locations) */}
+        {locationId === "all" && (
+          <div className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col mb-16 print:mb-0">
+            <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                <Logo />
+                <div>
+                  <h1 className="text-2xl font-bold tracking-tight uppercase">Resumen Ejecutivo</h1>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Docks del Puerto • Gerencia</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold">PERÍODO: {month}</p>
+                <p className="text-[10px] text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-bold">PERÍODO: {month}</p>
-              <p className="text-xs text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
+
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total a Pagar</p>
+                <p className="text-xl font-bold text-slate-900">{formatCurrency(globalTotals.earned)}</p>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pagado</p>
+                <p className="text-xl font-bold text-emerald-700">{formatCurrency(globalTotals.paid)}</p>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Saldo Pendiente</p>
+                <p className="text-xl font-bold text-slate-900">{formatCurrency(globalTotals.pending)}</p>
+              </div>
+            </div>
+
+            <h3 className="text-sm font-bold uppercase mb-2 border-b border-slate-200 pb-1">Desglose por Local</h3>
+            <table className="w-full text-xs mb-8">
+              <thead>
+                <tr className="border-b border-slate-900">
+                  <th className="text-left py-2 font-bold uppercase">Local</th>
+                  <th className="text-center py-2 font-bold uppercase">Empleados</th>
+                  <th className="text-right py-2 font-bold uppercase">Total</th>
+                  <th className="text-right py-2 font-bold uppercase">Pagado</th>
+                  <th className="text-right py-2 font-bold uppercase">Pendiente</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {groupedData.map((group) => (
+                  <tr key={group?.location.id}>
+                    <td className="py-2 font-bold">{group?.location.name}</td>
+                    <td className="py-2 text-center">{group?.employees.length}</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(group?.totals.earned || 0)}</td>
+                    <td className="py-2 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
+                    <td className="py-2 text-right font-bold">{formatCurrency(group?.totals.pending || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            <div className="mt-auto pt-4 border-t border-slate-200">
+               <p className="text-[8px] text-slate-400 uppercase tracking-widest text-center">
+                  Documento confidencial para uso exclusivo de gerencia
+               </p>
             </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-3 gap-6 mb-12">
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Total a Pagar</p>
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(globalTotals.earned)}</p>
+        {/* INDIVIDUAL LOCATION PAGES */}
+        {groupedData.map((group, index) => (
+          <div key={group?.location.id} className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col relative pt-4 mb-16 print:mb-0">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center gap-3">
+                <Logo />
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight uppercase">Reporte de Pagos</h1>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                    Local: <span className="text-blue-600">{group?.location.name}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold">PERÍODO: {month}</p>
+                <p className="text-[10px] text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
+              </div>
             </div>
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Total Pagado</p>
-              <p className="text-2xl font-bold text-emerald-700">{formatCurrency(globalTotals.paid)}</p>
-            </div>
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg">
-              <p className="text-xs font-bold text-slate-500 uppercase mb-1">Saldo Pendiente</p>
-              <p className="text-2xl font-bold text-slate-900">{formatCurrency(globalTotals.pending)}</p>
-            </div>
-          </div>
 
-          <h3 className="text-lg font-bold uppercase mb-4 border-b border-slate-200 pb-2">Desglose por Local</h3>
-          <table className="w-full text-sm mb-8">
-            <thead>
-              <tr className="border-b border-slate-900">
-                <th className="text-left py-3 font-bold uppercase">Local</th>
-                <th className="text-center py-3 font-bold uppercase">Empleados</th>
-                <th className="text-right py-3 font-bold uppercase">Total</th>
-                <th className="text-right py-3 font-bold uppercase">Pagado</th>
-                <th className="text-right py-3 font-bold uppercase">Pendiente</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {groupedData.map((group) => (
-                <tr key={group?.location.id}>
-                  <td className="py-3 font-bold">{group?.location.name}</td>
-                  <td className="py-3 text-center">{group?.employees.length}</td>
-                  <td className="py-3 text-right font-medium">{formatCurrency(group?.totals.earned || 0)}</td>
+            {/* Main Table */}
+            <table className="w-full text-xs border-collapse mb-8">
+              <thead>
+                <tr className="border-b-2 border-slate-900 bg-slate-50">
+                  <th className="text-left py-2 pl-2 font-bold uppercase w-1/3">Empleado / Rol</th>
+                  <th className="text-center py-2 font-bold uppercase">Días Trab.</th>
+                  <th className="text-right py-2 font-bold uppercase">Jornal</th>
+                  <th className="text-right py-2 font-bold uppercase">A Pagar</th>
+                  <th className="text-right py-2 font-bold uppercase">Pagado</th>
+                  <th className="text-right py-2 pr-2 font-bold uppercase">Saldo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {group?.employees.map((row) => (
+                  <tr key={row.employee.id} className="break-inside-avoid hover:bg-slate-50">
+                    <td className="py-2 pl-2">
+                      <div className="font-bold text-slate-900">{row.employee.name}</div>
+                      <div className="text-[9px] text-slate-500 uppercase tracking-wide">{row.employee.role}</div>
+                    </td>
+                    <td className="py-2 text-center font-medium">{row.daysWorked}</td>
+                    <td className="py-2 text-right text-slate-500">{formatCurrency(row.employee.dailyRate)}</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(row.totalEarned)}</td>
+                    <td className="py-2 text-right text-emerald-700">{formatCurrency(row.totalPaid)}</td>
+                    <td className={`py-2 pr-2 text-right font-bold ${row.pendingAmount > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
+                      {formatCurrency(row.pendingAmount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-sm">
+                  <td className="py-3 pl-2">TOTAL {group?.location.name}</td>
+                  <td className="py-3 text-center">-</td>
+                  <td className="py-3 text-right">-</td>
+                  <td className="py-3 text-right">{formatCurrency(group?.totals.earned || 0)}</td>
                   <td className="py-3 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
-                  <td className="py-3 text-right font-bold">{formatCurrency(group?.totals.pending || 0)}</td>
+                  <td className="py-3 pr-2 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          <div className="mt-auto pt-8 border-t border-slate-200">
-             <p className="text-[10px] text-slate-400 uppercase tracking-widest text-center">
-                Documento confidencial para uso exclusivo de gerencia
-             </p>
-          </div>
-        </div>
-      )}
+              </tfoot>
+            </table>
 
-      {/* INDIVIDUAL LOCATION PAGES */}
-      {groupedData.map((group, index) => (
-        <div key={group?.location.id} className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col relative pt-8">
-          {/* Header */}
-          <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-6">
-            <div className="flex items-center gap-4">
-              <Logo />
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight uppercase">Reporte de Pagos</h1>
-                <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">
-                  Local: <span className="text-blue-600">{group?.location.name}</span>
-                </p>
+            {/* Signatures Area */}
+            <div className="mt-auto mb-8 grid grid-cols-2 gap-12 break-inside-avoid px-8">
+              <div className="border-t border-slate-400 pt-2 text-center">
+                <p className="text-[10px] font-bold uppercase text-slate-500">Firma Responsable Local</p>
+              </div>
+              <div className="border-t border-slate-400 pt-2 text-center">
+                <p className="text-[10px] font-bold uppercase text-slate-500">Firma Gerencia / Admin</p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-bold">PERÍODO: {month}</p>
-              <p className="text-xs text-slate-500">Generado: {formatDate(getCurrentDateISO())}</p>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-slate-100 text-center">
+              <p className="text-[8px] text-slate-400 uppercase tracking-widest">
+                Docks del Puerto • Control Operativo • {group?.location.name}
+              </p>
             </div>
           </div>
-
-          {/* Main Table */}
-          <table className="w-full text-sm border-collapse mb-8">
-            <thead>
-              <tr className="border-b-2 border-slate-900 bg-slate-50">
-                <th className="text-left py-3 pl-2 font-bold uppercase w-1/3">Empleado / Rol</th>
-                <th className="text-center py-3 font-bold uppercase">Días Trab.</th>
-                <th className="text-right py-3 font-bold uppercase">Jornal</th>
-                <th className="text-right py-3 font-bold uppercase">A Pagar</th>
-                <th className="text-right py-3 font-bold uppercase">Pagado</th>
-                <th className="text-right py-3 pr-2 font-bold uppercase">Saldo</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {group?.employees.map((row) => (
-                <tr key={row.employee.id} className="break-inside-avoid hover:bg-slate-50">
-                  <td className="py-3 pl-2">
-                    <div className="font-bold text-slate-900">{row.employee.name}</div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide">{row.employee.role}</div>
-                  </td>
-                  <td className="py-3 text-center font-medium">{row.daysWorked}</td>
-                  <td className="py-3 text-right text-slate-500">{formatCurrency(row.employee.dailyRate)}</td>
-                  <td className="py-3 text-right font-medium">{formatCurrency(row.totalEarned)}</td>
-                  <td className="py-3 text-right text-emerald-700">{formatCurrency(row.totalPaid)}</td>
-                  <td className={`py-3 pr-2 text-right font-bold ${row.pendingAmount > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {formatCurrency(row.pendingAmount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-base">
-                <td className="py-4 pl-2">TOTAL {group?.location.name}</td>
-                <td className="py-4 text-center">-</td>
-                <td className="py-4 text-right">-</td>
-                <td className="py-4 text-right">{formatCurrency(group?.totals.earned || 0)}</td>
-                <td className="py-4 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
-                <td className="py-4 pr-2 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          {/* Signatures Area */}
-          <div className="mt-auto mb-12 grid grid-cols-2 gap-16 break-inside-avoid px-8">
-            <div className="border-t border-slate-400 pt-2 text-center">
-              <p className="text-xs font-bold uppercase text-slate-500">Firma Responsable Local</p>
-            </div>
-            <div className="border-t border-slate-400 pt-2 text-center">
-              <p className="text-xs font-bold uppercase text-slate-500">Firma Gerencia / Admin</p>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="pt-4 border-t border-slate-100 text-center">
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest">
-              Docks del Puerto • Control Operativo • {group?.location.name}
-            </p>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
