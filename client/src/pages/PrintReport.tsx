@@ -2,8 +2,26 @@
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
 import { useLocation } from "wouter";
+import { Mail, Printer, Send } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 export default function PrintReport() {
+  const [email, setEmail] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
   const { employees, locations, attendance, payments } = useStore();
   const [location] = useLocation();
   
@@ -83,17 +101,74 @@ export default function PrintReport() {
   return (
     <div className="bg-white min-h-screen p-8 print:p-0 font-sans text-slate-900">
       {/* Print Controls */}
-      <div className="print:hidden mb-8 flex justify-between items-center bg-slate-100 p-4 rounded-lg border border-slate-200">
+      <div className="print:hidden mb-8 flex justify-between items-center bg-slate-100 p-4 rounded-lg border border-slate-200 shadow-sm">
         <div>
-          <h2 className="font-bold text-lg">Vista de Impresión</h2>
-          <p className="text-sm text-slate-500">Use Ctrl+P o Cmd+P para imprimir. Se generará una hoja por local.</p>
+          <h2 className="font-bold text-lg text-slate-900">Vista de Impresión</h2>
+          <p className="text-sm text-slate-500">Se generará una hoja A4 por cada local.</p>
         </div>
-        <button 
-          onClick={() => window.print()}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 transition-colors shadow-sm"
-        >
-          Imprimir Reporte
-        </button>
+        <div className="flex gap-3">
+          <Dialog open={isEmailOpen} onOpenChange={setIsEmailOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2 border-slate-300">
+                <Mail className="w-4 h-4" />
+                Enviar por Email
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Enviar Reporte por Email</DialogTitle>
+                <DialogDescription>
+                  Se abrirá tu cliente de correo con un resumen del reporte listo para enviar.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Destinatario</Label>
+                  <Input
+                    id="email"
+                    placeholder="gerencia@docks.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button 
+                  onClick={() => {
+                    if (!email) {
+                      toast.error("Ingresa un email válido");
+                      return;
+                    }
+                    setIsSending(true);
+                    
+                    // Simulate sending delay
+                    setTimeout(() => {
+                      const subject = `Reporte de Pagos - ${month}`;
+                      const body = `Adjunto el reporte de pagos del período ${month}.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
+                      
+                      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                      
+                      setIsSending(false);
+                      setIsEmailOpen(false);
+                      toast.success("Cliente de correo abierto");
+                    }, 1000);
+                  }} 
+                  disabled={isSending}
+                >
+                  {isSending ? "Abriendo..." : "Redactar Correo"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button 
+            onClick={() => window.print()}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir Reporte
+          </Button>
+        </div>
       </div>
 
       {/* SUMMARY PAGE (Only if viewing ALL locations) */}
