@@ -1,13 +1,14 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AttendanceRecord, Employee, EMPLOYEES, Location, LOCATIONS, PaymentRecord } from './data';
+import { AdvanceRecord, AttendanceRecord, Employee, EMPLOYEES, Location, LOCATIONS, PaymentRecord } from './data';
 
 interface AppState {
   employees: Employee[];
   locations: Location[];
   attendance: AttendanceRecord[];
   payments: PaymentRecord[];
+  advances: AdvanceRecord[];
   
   // Actions
   updateEmployee: (id: string, data: Partial<Employee>) => void;
@@ -15,11 +16,14 @@ interface AppState {
   addAttendance: (record: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
   removeAttendance: (employeeId: string, date: string) => void;
   markPaid: (employeeId: string, date: string, amount: number, extras?: number) => void;
+  addAdvance: (employeeId: string, amount: number, date: string, note?: string) => void;
+  removeAdvance: (id: string) => void;
   resetData: () => void;
   
   // Selectors
   getEmployeeAttendance: (employeeId: string, month: string) => AttendanceRecord[];
   getEmployeePayments: (employeeId: string, month: string) => PaymentRecord[];
+  getEmployeeAdvances: (employeeId: string, month: string) => AdvanceRecord[];
 }
 
 export const useStore = create<AppState>()(
@@ -29,6 +33,7 @@ export const useStore = create<AppState>()(
       locations: LOCATIONS,
       attendance: [],
       payments: [],
+      advances: [],
 
       updateEmployee: (id, data) => {
         set((state) => ({
@@ -112,8 +117,31 @@ export const useStore = create<AppState>()(
         });
       },
 
+      addAdvance: (employeeId, amount, date, note) => {
+        set((state) => ({
+          advances: [
+            ...state.advances,
+            {
+              id: crypto.randomUUID(),
+              employeeId,
+              amount,
+              date,
+              note,
+              period: date.substring(0, 7),
+              timestamp: Date.now(),
+            },
+          ],
+        }));
+      },
+
+      removeAdvance: (id) => {
+        set((state) => ({
+          advances: state.advances.filter((a) => a.id !== id),
+        }));
+      },
+
       resetData: () => {
-        set({ attendance: [], payments: [] });
+        set({ attendance: [], payments: [], advances: [] });
       },
 
       getEmployeeAttendance: (employeeId: string, month: string) => {
@@ -127,6 +155,13 @@ export const useStore = create<AppState>()(
         const { payments } = get();
         return payments.filter(
           (p) => p.employeeId === employeeId && p.period === month
+        );
+      },
+
+      getEmployeeAdvances: (employeeId: string, month: string) => {
+        const { advances } = get();
+        return advances.filter(
+          (a) => a.employeeId === employeeId && a.period === month
         );
       },
     }),

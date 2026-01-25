@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
-import { CheckCircle2, Clock, Plus } from "lucide-react";
+import { CheckCircle2, Clock, Plus, Wallet, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,9 +19,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 export default function Payments() {
-  const { employees, locations, attendance, payments, markPaid } = useStore();
+  const { employees, locations, attendance, payments, advances, markPaid, addAdvance, removeAdvance } = useStore();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentDateISO().substring(0, 7));
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
@@ -36,6 +37,15 @@ export default function Payments() {
   } | null>(null);
   const [extrasAmount, setExtrasAmount] = useState("0");
   const [overtimeHours, setOvertimeHours] = useState("");
+
+  // Advance Dialog State
+  const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
+  const [selectedEmployeeForAdvance, setSelectedEmployeeForAdvance] = useState<{id: string, name: string} | null>(null);
+  const [advanceForm, setAdvanceForm] = useState({
+    amount: "",
+    date: getCurrentDateISO(),
+    note: ""
+  });
 
   const processedData = useMemo(() => {
     return employees
@@ -56,32 +66,39 @@ export default function Payments() {
           p => p.employeeId === employee.id && p.period === selectedMonth
         );
 
-        const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount + (p.extras || 0), 0);
-        const pendingAmount = totalEarned - totalPaid; // Note: Extras are on top, so they don't reduce pending base salary, but for simplicity we track total paid vs total earned base. 
-        // Actually, better logic: Pending = (Days * Rate) - (Paid Base). Extras are separate.
-        // But to keep it simple for now: Pending = (Days * Rate) - (Total Paid - Total Extras)
-        
+        // Get advances for this month
+        const monthlyAdvances = advances.filter(
+          a => a.employeeId === employee.id && a.period === selectedMonth
+        );
+
         const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
         const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+        const totalAdvances = monthlyAdvances.reduce((sum, a) => sum + a.amount, 0);
         
-        const realPending = totalEarned - totalPaidBase;
+        const totalPaid = totalPaidBase + totalExtras;
+        
+        // Pending = Earned - PaidBase - Advances
+        // Note: Advances reduce the pending amount because they are pre-payments
+        const realPending = totalEarned - totalPaidBase - totalAdvances;
 
         // Determine status
         let status = 'none';
         if (monthlyAttendance.length === 0) status = 'no_activity';
         else if (realPending <= 0) status = 'paid';
-        else if (totalPaidBase > 0) status = 'partial';
+        else if (totalPaidBase > 0 || totalAdvances > 0) status = 'partial';
         else status = 'pending';
 
         return {
           employee,
           attendance: monthlyAttendance,
           payments: monthlyPayments,
+          advances: monthlyAdvances,
           summary: {
             daysWorked: monthlyAttendance.length,
             totalEarned,
             totalPaid,
             totalExtras,
+            totalAdvances,
             pendingAmount: realPending,
             status
           }
@@ -100,7 +117,7 @@ export default function Payments() {
         }
         return a.employee.name.localeCompare(b.employee.name);
       });
-  }, [employees, attendance, payments, selectedMonth, selectedLocation, paymentStatus]);
+  }, [employees, attendance, payments, advances, selectedMonth, selectedLocation, paymentStatus]);
 
   const handleOpenPayDialog = (employeeId: string, date: string, amount: number, employeeName: string) => {
     setSelectedPayment({ employeeId, date, amount, employeeName });
@@ -133,13 +150,37 @@ export default function Payments() {
     setExtrasAmount(overtimeValue.toString());
   };
 
+  const handleOpenAdvanceDialog = (employee: {id: string, name: string}) => {
+    setSelectedEmployeeForAdvance(employee);
+    setAdvanceForm({
+      amount: "",
+      date: getCurrentDateISO(),
+      note: ""
+    });
+    setIsAdvanceDialogOpen(true);
+  };
+
+  const handleSaveAdvance = () => {
+    if (!selectedEmployeeForAdvance || !advanceForm.amount) return;
+
+    addAdvance(
+      selectedEmployeeForAdvance.id,
+      Number(advanceForm.amount),
+      advanceForm.date,
+      advanceForm.note
+    );
+
+    toast.success("Adelanto registrado correctamente");
+    setIsAdvanceDialogOpen(false);
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Pagos</h1>
-            <p className="text-slate-500 mt-2">Control de liquidaciones y pagos pendientes.</p>
+            <p className="text-slate-500 mt-2">Control de liquidaciones, adelantos y pagos pendientes.</p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
@@ -176,7 +217,7 @@ export default function Payments() {
         </div>
 
         <div className="space-y-6">
-          {processedData.map(({ employee, attendance, payments, summary }) => {
+          {processedData.map(({ employee, attendance, payments, advances, summary }) => {
             // Group attendance by date to show history
             const sortedAttendance = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
             
@@ -218,6 +259,15 @@ export default function Payments() {
                           </p>
                         </div>
                       )}
+
+                      {summary.totalAdvances > 0 && (
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Adelantos</p>
+                          <p className="font-bold text-red-600">
+                            -{formatCurrency(summary.totalAdvances)}
+                          </p>
+                        </div>
+                      )}
                       
                       <div className="text-right">
                         <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Pendiente</p>
@@ -226,23 +276,60 @@ export default function Payments() {
                         </p>
                       </div>
 
-                      <Badge variant={summary.status === 'paid' ? 'default' : 'secondary'} 
-                        className={
-                          summary.status === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
-                          summary.status === 'pending' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
-                          summary.status === 'partial' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
-                          'bg-slate-100 text-slate-500'
-                        }
-                      >
-                        {summary.status === 'paid' ? 'Pagado' :
-                         summary.status === 'pending' ? 'Pendiente' :
-                         summary.status === 'partial' ? 'Parcial' : 'Sin actividad'}
-                      </Badge>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-8 gap-1 text-slate-600"
+                          onClick={() => handleOpenAdvanceDialog(employee)}
+                        >
+                          <Wallet className="w-3 h-3" />
+                          Adelanto
+                        </Button>
+                        <Badge variant={summary.status === 'paid' ? 'default' : 'secondary'} 
+                          className={
+                            summary.status === 'paid' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' :
+                            summary.status === 'pending' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' :
+                            summary.status === 'partial' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' :
+                            'bg-slate-100 text-slate-500'
+                          }
+                        >
+                          {summary.status === 'paid' ? 'Pagado' :
+                           summary.status === 'pending' ? 'Pendiente' :
+                           summary.status === 'partial' ? 'Parcial' : 'Sin actividad'}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 
                 <CardContent className="p-0">
+                  {/* Advances Section */}
+                  {advances.length > 0 && (
+                    <div className="bg-red-50/30 border-b border-slate-100 px-4 py-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Adelantos Registrados</p>
+                      <div className="space-y-1">
+                        {advances.map(advance => (
+                          <div key={advance.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-700 font-medium">{formatDate(advance.date)}</span>
+                              {advance.note && <span className="text-slate-500 italic">- {advance.note}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-red-600">-{formatCurrency(advance.amount)}</span>
+                              <button 
+                                onClick={() => removeAdvance(advance.id)}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {sortedAttendance.length > 0 ? (
                     <div className="divide-y divide-slate-100">
                       {sortedAttendance.map(record => {
@@ -384,6 +471,62 @@ export default function Payments() {
               <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleConfirmPayment} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 Confirmar Pago
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Advance Dialog */}
+        <Dialog open={isAdvanceDialogOpen} onOpenChange={setIsAdvanceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Adelanto</DialogTitle>
+              <DialogDescription>
+                Entregar dinero a cuenta para {selectedEmployeeForAdvance?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="advanceAmount">Monto ($)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <Input
+                    id="advanceAmount"
+                    type="number"
+                    className="pl-7"
+                    value={advanceForm.amount}
+                    onChange={(e) => setAdvanceForm({ ...advanceForm, amount: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="advanceDate">Fecha</Label>
+                <Input
+                  id="advanceDate"
+                  type="date"
+                  value={advanceForm.date}
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, date: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="advanceNote">Nota (Opcional)</Label>
+                <Input
+                  id="advanceNote"
+                  value={advanceForm.note}
+                  onChange={(e) => setAdvanceForm({ ...advanceForm, note: e.target.value })}
+                  placeholder="Ej: Para transporte"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAdvanceDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveAdvance} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Guardar Adelanto
               </Button>
             </DialogFooter>
           </DialogContent>

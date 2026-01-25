@@ -21,7 +21,7 @@ export default function PrintReport() {
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   
-  const { employees, locations, attendance, payments } = useStore();
+    const { employees, locations, attendance, payments, advances } = useStore();
   const [location] = useLocation();
   
   // Extract params from URL
@@ -58,11 +58,17 @@ export default function PrintReport() {
       p => p.employeeId === employee.id && p.period === month
     );
 
+    const monthlyAdvances = advances.filter(
+      a => a.employeeId === employee.id && a.period === month
+    );
+
     const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+    const totalAdvances = monthlyAdvances.reduce((sum, a) => sum + a.amount, 0);
     const totalPaid = totalPaidBase + totalExtras;
     
-    const pendingAmount = totalEarned - totalPaidBase; // Pending is based on base salary
+    // Pending = Earned - PaidBase - Advances
+    const pendingAmount = totalEarned - totalPaidBase - totalAdvances;
 
     return {
       employee,
@@ -70,6 +76,7 @@ export default function PrintReport() {
       totalEarned,
       totalPaidBase,
       totalExtras,
+      totalAdvances,
       totalPaid,
       pendingAmount
     };
@@ -86,9 +93,10 @@ export default function PrintReport() {
         earned: acc.earned + curr.totalEarned,
         paidBase: acc.paidBase + curr.totalPaidBase,
         extras: acc.extras + curr.totalExtras,
+        advances: acc.advances + curr.totalAdvances,
         paid: acc.paid + curr.totalPaid,
         pending: acc.pending + curr.pendingAmount
-      }), { earned: 0, paidBase: 0, extras: 0, paid: 0, pending: 0 });
+      }), { earned: 0, paidBase: 0, extras: 0, advances: 0, paid: 0, pending: 0 });
 
       return {
         location: loc,
@@ -103,8 +111,9 @@ export default function PrintReport() {
     earned: acc.earned + (curr?.totals.earned || 0),
     paid: acc.paid + (curr?.totals.paid || 0),
     extras: acc.extras + (curr?.totals.extras || 0),
+    advances: acc.advances + (curr?.totals.advances || 0),
     pending: acc.pending + (curr?.totals.pending || 0)
-  }), { earned: 0, paid: 0, extras: 0, pending: 0 });
+  }), { earned: 0, paid: 0, extras: 0, advances: 0, pending: 0 });
 
   const Logo = () => (
     <div className="w-8 h-8 grid grid-cols-2 gap-0.5 rounded overflow-hidden shrink-0 print:border print:border-slate-200" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
@@ -122,6 +131,7 @@ export default function PrintReport() {
     text += `RESUMEN GLOBAL\n`;
     text += `Total a Pagar: ${formatCurrency(globalTotals.earned)}\n`;
     text += `Total Extras: ${formatCurrency(globalTotals.extras)}\n`;
+    text += `Total Adelantos: ${formatCurrency(globalTotals.advances)}\n`;
     text += `Total Pagado: ${formatCurrency(globalTotals.paid)}\n`;
     text += `Saldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\n`;
     text += `----------------------------------------\n\n`;
@@ -136,6 +146,7 @@ export default function PrintReport() {
       text += `DETALLE POR EMPLEADO:\n`;
       group.employees.forEach(d => {
         text += `- ${d.employee.name}: ${formatCurrency(d.totalPaid)} pagado`;
+        if (d.totalAdvances > 0) text += ` [Adelantos: -${formatCurrency(d.totalAdvances)}]`;
         if (d.pendingAmount > 0) text += ` (Pendiente: ${formatCurrency(d.pendingAmount)})`;
         if (d.totalExtras > 0) text += ` [Incluye ${formatCurrency(d.totalExtras)} extras]`;
         text += `\n`;
@@ -238,8 +249,8 @@ export default function PrintReport() {
                 <p className="text-xl font-bold text-blue-600">{formatCurrency(globalTotals.extras)}</p>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
-                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pagado</p>
-                <p className="text-xl font-bold text-emerald-700">{formatCurrency(globalTotals.paid)}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total Adelantos</p>
+                <p className="text-xl font-bold text-red-600">{formatCurrency(globalTotals.advances)}</p>
               </div>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
                 <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Saldo Pendiente</p>
@@ -255,6 +266,7 @@ export default function PrintReport() {
                   <th className="text-center py-2 font-bold uppercase">Empleados</th>
                   <th className="text-right py-2 font-bold uppercase">Base</th>
                   <th className="text-right py-2 font-bold uppercase">Extras</th>
+                  <th className="text-right py-2 font-bold uppercase">Adelantos</th>
                   <th className="text-right py-2 font-bold uppercase">Total Pagado</th>
                   <th className="text-right py-2 font-bold uppercase">Pendiente</th>
                 </tr>
@@ -266,6 +278,7 @@ export default function PrintReport() {
                     <td className="py-2 text-center">{group?.employees.length}</td>
                     <td className="py-2 text-right font-medium">{formatCurrency(group?.totals.earned || 0)}</td>
                     <td className="py-2 text-right text-blue-600">{formatCurrency(group?.totals.extras || 0)}</td>
+                    <td className="py-2 text-right text-red-600">{formatCurrency(group?.totals.advances || 0)}</td>
                     <td className="py-2 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
                     <td className="py-2 text-right font-bold">{formatCurrency(group?.totals.pending || 0)}</td>
                   </tr>
@@ -309,6 +322,7 @@ export default function PrintReport() {
                     <th className="text-center py-2 font-bold uppercase">Días</th>
                     <th className="text-right py-2 font-bold uppercase">A Pagar</th>
                     <th className="text-right py-2 font-bold uppercase text-blue-600">Extras</th>
+                    <th className="text-right py-2 font-bold uppercase text-red-600">Adelantos</th>
                     <th className="text-right py-2 font-bold uppercase text-emerald-700">Pagado</th>
                     <th className="text-right py-2 font-bold uppercase">Pendiente</th>
                   </tr>
@@ -326,6 +340,9 @@ export default function PrintReport() {
                       <td className="py-3 text-right text-blue-600 font-medium">
                         {data.totalExtras > 0 ? formatCurrency(data.totalExtras) : '-'}
                       </td>
+                      <td className="py-3 text-right text-red-600 font-medium">
+                        {data.totalAdvances > 0 ? `-${formatCurrency(data.totalAdvances)}` : '-'}
+                      </td>
                       <td className="py-3 text-right text-emerald-700 font-bold">{formatCurrency(data.totalPaid)}</td>
                       <td className="py-3 text-right font-bold text-slate-900">
                         {data.pendingAmount > 0 ? formatCurrency(data.pendingAmount) : '-'}
@@ -339,6 +356,7 @@ export default function PrintReport() {
                     <td className="py-3 text-center">{group?.employees.reduce((acc, curr) => acc + curr.daysWorked, 0)}</td>
                     <td className="py-3 text-right">{formatCurrency(group?.totals.earned || 0)}</td>
                     <td className="py-3 text-right text-blue-600">{formatCurrency(group?.totals.extras || 0)}</td>
+                    <td className="py-3 text-right text-red-600">{formatCurrency(group?.totals.advances || 0)}</td>
                     <td className="py-3 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
                     <td className="py-3 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
                   </tr>

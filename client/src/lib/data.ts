@@ -33,6 +33,16 @@ export interface PaymentRecord {
   timestamp: number;
 }
 
+export interface AdvanceRecord {
+  id: string;
+  employeeId: string;
+  date: string; // ISO YYYY-MM-DD
+  amount: number;
+  note?: string;
+  period: string; // YYYY-MM
+  timestamp: number;
+}
+
 export const LOCATIONS: Location[] = [
   { id: 'umo', name: 'UMO', active: true },
   { id: 'brooklyn', name: 'BROOKLYN', active: true },
