@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
-import { CheckCircle2, Clock, Plus, Wallet, X, Zap } from "lucide-react";
+import { CheckCircle2, Clock, Download, Plus, Wallet, X, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -226,6 +226,54 @@ export default function Payments() {
     setIsExtraDialogOpen(false);
   };
 
+  const handleExportCSV = () => {
+    // Header row
+    const headers = [
+      "Empleado",
+      "Local",
+      "Días Trabajados",
+      "Total Ganado",
+      "Total Extras",
+      "Total Adelantos",
+      "Total Pagado",
+      "Saldo Pendiente",
+      "Estado"
+    ];
+
+    // Data rows
+    const rows = processedData.map(({ employee, summary }) => {
+      const locationName = locations.find(l => l.id === employee.locationId)?.name || "Desconocido";
+      return [
+        employee.name,
+        locationName,
+        summary.daysWorked,
+        summary.totalEarned,
+        summary.totalExtras,
+        summary.totalAdvances,
+        summary.totalPaid,
+        summary.pendingAmount,
+        summary.status === 'paid' ? 'Pagado' : summary.status === 'pending' ? 'Pendiente' : summary.status === 'partial' ? 'Parcial' : 'Sin actividad'
+      ];
+    });
+
+    // Combine header and rows
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `pagos_${selectedMonth}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -265,6 +313,9 @@ export default function Payments() {
                 <SelectItem value="paid">Pagados</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" size="icon" onClick={handleExportCSV} title="Exportar a CSV">
+              <Download className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
