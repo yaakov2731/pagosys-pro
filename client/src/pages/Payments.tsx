@@ -35,6 +35,7 @@ export default function Payments() {
     employeeName: string;
   } | null>(null);
   const [extrasAmount, setExtrasAmount] = useState("0");
+  const [overtimeHours, setOvertimeHours] = useState("");
 
   const processedData = useMemo(() => {
     return employees
@@ -104,6 +105,7 @@ export default function Payments() {
   const handleOpenPayDialog = (employeeId: string, date: string, amount: number, employeeName: string) => {
     setSelectedPayment({ employeeId, date, amount, employeeName });
     setExtrasAmount("0");
+    setOvertimeHours("");
     setIsPayDialogOpen(true);
   };
 
@@ -118,7 +120,17 @@ export default function Payments() {
       setIsPayDialogOpen(false);
       setSelectedPayment(null);
       setExtrasAmount("0");
+      setOvertimeHours("");
     }
+  };
+
+  const calculateOvertime = (hours: string) => {
+    setOvertimeHours(hours);
+    if (!selectedPayment || !hours) return;
+    
+    const hourlyRate = selectedPayment.amount / 8; // Assuming 8 hour workday
+    const overtimeValue = Math.round(hourlyRate * Number(hours));
+    setExtrasAmount(overtimeValue.toString());
   };
 
   return (
@@ -322,24 +334,49 @@ export default function Payments() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="extras" className="text-sm font-medium text-slate-700">
-                  Agregar Horas Extras / Bonos ($)
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                  <Input
-                    id="extras"
-                    type="number"
-                    value={extrasAmount}
-                    onChange={(e) => setExtrasAmount(e.target.value)}
-                    className="pl-7 bg-white"
-                    placeholder="0"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="overtime" className="text-sm font-medium text-slate-700">
+                    Calculadora Horas
+                  </Label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      id="overtime"
+                      type="number"
+                      value={overtimeHours}
+                      onChange={(e) => calculateOvertime(e.target.value)}
+                      className="pl-9 bg-white"
+                      placeholder="Cant. Horas"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Calcula valor basado en jornal de 8hs.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  Ingrese el monto adicional a pagar por horas extras o premios.
-                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="extras" className="text-sm font-medium text-slate-700">
+                    Monto Extra ($)
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                    <Input
+                      id="extras"
+                      type="number"
+                      value={extrasAmount}
+                      onChange={(e) => {
+                        setExtrasAmount(e.target.value);
+                        setOvertimeHours(""); // Clear hours if manual amount entered
+                      }}
+                      className="pl-7 bg-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Total a sumar como extra.
+                  </p>
+                </div>
               </div>
             </div>
 
