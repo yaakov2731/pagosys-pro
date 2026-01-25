@@ -14,12 +14,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 export default function PrintReport() {
-  const [email, setEmail] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -118,11 +115,7 @@ export default function PrintReport() {
     </div>
   );
 
-  const handleSendEmail = async () => {
-    if (!email) {
-      toast.error("Ingresa un email válido");
-      return;
-    }
+  const handleDownloadPDF = async () => {
     setIsSending(true);
     
     try {
@@ -144,17 +137,9 @@ export default function PrintReport() {
 
       await html2pdf().set(opt).from(element).save();
       
-      // 2. Open Email Client
-      setTimeout(() => {
-        const subject = `Reporte de Pagos - ${periodString}`;
-        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${periodString}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Extras: ${formatCurrency(globalTotals.extras)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
-        
-        window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        setIsSending(false);
-        setIsEmailOpen(false);
-        toast.success("PDF descargado. Adjúntalo al correo abierto.");
-      }, 1500);
+      setIsSending(false);
+      setIsEmailOpen(false);
+      toast.success("PDF descargado. Ahora puedes adjuntarlo a tu correo.");
 
     } catch (error) {
       console.error(error);
@@ -176,30 +161,19 @@ export default function PrintReport() {
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 border-slate-300">
                 <Mail className="w-4 h-4" />
-                Enviar por Email
+                Descargar PDF para Email
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Enviar Reporte por Email</DialogTitle>
+                <DialogTitle>Descargar Reporte PDF</DialogTitle>
                 <DialogDescription>
-                  El sistema descargará el PDF completo y abrirá tu correo para que lo adjuntes.
+                  El sistema descargará el PDF completo en tu computadora. Luego podrás adjuntarlo manualmente a tu correo.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Destinatario</Label>
-                  <Input
-                    id="email"
-                    placeholder="gerencia@docks.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-              </div>
               <DialogFooter>
-                <Button onClick={handleSendEmail} disabled={isSending}>
-                  {isSending ? "Generando PDF..." : "Descargar y Redactar"}
+                <Button onClick={handleDownloadPDF} disabled={isSending}>
+                  {isSending ? "Generando PDF..." : "Descargar PDF"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -317,7 +291,6 @@ export default function PrintReport() {
                     <th className="text-right py-2 font-bold uppercase text-blue-600">Extras</th>
                     <th className="text-right py-2 font-bold uppercase text-emerald-700">Pagado</th>
                     <th className="text-right py-2 font-bold uppercase">Pendiente</th>
-                    <th className="text-center py-2 font-bold uppercase w-1/6">Firma</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -337,7 +310,6 @@ export default function PrintReport() {
                       <td className="py-3 text-right font-bold text-slate-900">
                         {data.pendingAmount > 0 ? formatCurrency(data.pendingAmount) : '-'}
                       </td>
-                      <td className="py-3 border-b border-slate-100"></td>
                     </tr>
                   ))}
                   {/* Totals Row */}
@@ -349,28 +321,17 @@ export default function PrintReport() {
                     <td className="py-3 text-right text-blue-600">{formatCurrency(group?.totals.extras || 0)}</td>
                     <td className="py-3 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
                     <td className="py-3 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
-                    <td className="py-3"></td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* Footer Signatures */}
-            <div className="mt-auto pt-12 pb-4 break-inside-avoid">
-              <div className="grid grid-cols-3 gap-8">
-                <div className="text-center">
-                  <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500">Firma Responsable</p>
-                </div>
-                <div className="text-center">
-                  <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
-                  <p className="text-[10px] uppercase font-bold text-slate-500">Firma Gerencia</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] text-slate-400 italic">
-                    Página {index + 1} de {groupedData.length}
-                  </p>
-                </div>
+            {/* Footer Page Number Only */}
+            <div className="mt-auto pt-4 break-inside-avoid">
+              <div className="text-center">
+                <p className="text-[10px] text-slate-400 italic">
+                  Página {index + 1} de {groupedData.length}
+                </p>
               </div>
             </div>
           </div>
