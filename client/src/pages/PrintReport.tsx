@@ -2,7 +2,7 @@
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
 import { useLocation } from "wouter";
-import { Mail, Printer, Download } from "lucide-react";
+import { Mail, Printer } from "lucide-react";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 import {
@@ -53,13 +53,18 @@ export default function PrintReport() {
       p => p.employeeId === employee.id && p.period === month
     );
 
-    const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
-    const pendingAmount = totalEarned - totalPaid;
+    const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+    const totalPaid = totalPaidBase + totalExtras;
+    
+    const pendingAmount = totalEarned - totalPaidBase; // Pending is based on base salary
 
     return {
       employee,
       daysWorked: monthlyAttendance.length,
       totalEarned,
+      totalPaidBase,
+      totalExtras,
       totalPaid,
       pendingAmount
     };
@@ -74,9 +79,11 @@ export default function PrintReport() {
 
       const totals = locEmployees.reduce((acc, curr) => ({
         earned: acc.earned + curr.totalEarned,
+        paidBase: acc.paidBase + curr.totalPaidBase,
+        extras: acc.extras + curr.totalExtras,
         paid: acc.paid + curr.totalPaid,
         pending: acc.pending + curr.pendingAmount
-      }), { earned: 0, paid: 0, pending: 0 });
+      }), { earned: 0, paidBase: 0, extras: 0, paid: 0, pending: 0 });
 
       return {
         location: loc,
@@ -90,15 +97,16 @@ export default function PrintReport() {
   const globalTotals = groupedData.reduce((acc, curr) => ({
     earned: acc.earned + (curr?.totals.earned || 0),
     paid: acc.paid + (curr?.totals.paid || 0),
+    extras: acc.extras + (curr?.totals.extras || 0),
     pending: acc.pending + (curr?.totals.pending || 0)
-  }), { earned: 0, paid: 0, pending: 0 });
+  }), { earned: 0, paid: 0, extras: 0, pending: 0 });
 
   const Logo = () => (
-    <div className="w-8 h-8 grid grid-cols-2 gap-0.5 rounded overflow-hidden shrink-0 print:border print:border-slate-200">
-      <div className="bg-[#f97316] print:bg-slate-800"></div>
-      <div className="bg-[#16a34a] print:bg-slate-600"></div>
-      <div className="bg-[#eab308] print:bg-slate-400"></div>
-      <div className="bg-[#3b82f6] print:bg-slate-900"></div>
+    <div className="w-8 h-8 grid grid-cols-2 gap-0.5 rounded overflow-hidden shrink-0 print:border print:border-slate-200" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+      <div className="bg-[#f97316] print:bg-[#f97316]"></div>
+      <div className="bg-[#16a34a] print:bg-[#16a34a]"></div>
+      <div className="bg-[#eab308] print:bg-[#eab308]"></div>
+      <div className="bg-[#3b82f6] print:bg-[#3b82f6]"></div>
     </div>
   );
 
@@ -115,11 +123,11 @@ export default function PrintReport() {
       if (!element) return;
 
       const opt = {
-        margin: 10,
+        margin: 5,
         filename: `Reporte_Pagos_${month}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' as const }
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -127,7 +135,7 @@ export default function PrintReport() {
       // 2. Open Email Client
       setTimeout(() => {
         const subject = `Reporte de Pagos - ${month}`;
-        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${month}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
+        const body = `Hola,\n\nSe ha generado el reporte de pagos del período ${month}.\n\nEl archivo PDF se ha descargado automáticamente en tu computadora.\nPor favor, adjúntalo a este correo para enviarlo.\n\nResumen:\nTotal a Pagar: ${formatCurrency(globalTotals.earned)}\nTotal Extras: ${formatCurrency(globalTotals.extras)}\nTotal Pagado: ${formatCurrency(globalTotals.paid)}\nSaldo Pendiente: ${formatCurrency(globalTotals.pending)}\n\nSaludos,\nDocks del Puerto`;
         
         window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         
@@ -149,7 +157,7 @@ export default function PrintReport() {
       <div className="print:hidden mb-8 flex justify-between items-center bg-slate-100 p-4 rounded-lg border border-slate-200 shadow-sm">
         <div>
           <h2 className="font-bold text-lg text-slate-900">Vista de Impresión</h2>
-          <p className="text-sm text-slate-500">Se generará una hoja A4 por cada local.</p>
+          <p className="text-sm text-slate-500">Formato A4 Horizontal - Se generará una hoja por cada local.</p>
         </div>
         <div className="flex gap-3">
           <Dialog open={isEmailOpen} onOpenChange={setIsEmailOpen}>
@@ -196,10 +204,10 @@ export default function PrintReport() {
       </div>
 
       {/* REPORT CONTENT */}
-      <div ref={reportRef}>
+      <div ref={reportRef} className="print:w-[297mm]">
         {/* SUMMARY PAGE (Only if viewing ALL locations) */}
         {locationId === "all" && (
-          <div className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col mb-16 print:mb-0">
+          <div className="max-w-[297mm] mx-auto bg-white print:max-w-none print:h-[210mm] print:break-after-page flex flex-col mb-16 print:mb-0 p-8 print:p-8">
             <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
                 <Logo />
@@ -214,16 +222,20 @@ export default function PrintReport() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+            <div className="grid grid-cols-4 gap-4 mb-8">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
                 <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total a Pagar</p>
                 <p className="text-xl font-bold text-slate-900">{formatCurrency(globalTotals.earned)}</p>
               </div>
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total Extras</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(globalTotals.extras)}</p>
+              </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
                 <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Total Pagado</p>
                 <p className="text-xl font-bold text-emerald-700">{formatCurrency(globalTotals.paid)}</p>
               </div>
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
                 <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Saldo Pendiente</p>
                 <p className="text-xl font-bold text-slate-900">{formatCurrency(globalTotals.pending)}</p>
               </div>
@@ -235,8 +247,9 @@ export default function PrintReport() {
                 <tr className="border-b border-slate-900">
                   <th className="text-left py-2 font-bold uppercase">Local</th>
                   <th className="text-center py-2 font-bold uppercase">Empleados</th>
-                  <th className="text-right py-2 font-bold uppercase">Total</th>
-                  <th className="text-right py-2 font-bold uppercase">Pagado</th>
+                  <th className="text-right py-2 font-bold uppercase">Base</th>
+                  <th className="text-right py-2 font-bold uppercase">Extras</th>
+                  <th className="text-right py-2 font-bold uppercase">Total Pagado</th>
                   <th className="text-right py-2 font-bold uppercase">Pendiente</th>
                 </tr>
               </thead>
@@ -246,6 +259,7 @@ export default function PrintReport() {
                     <td className="py-2 font-bold">{group?.location.name}</td>
                     <td className="py-2 text-center">{group?.employees.length}</td>
                     <td className="py-2 text-right font-medium">{formatCurrency(group?.totals.earned || 0)}</td>
+                    <td className="py-2 text-right text-blue-600">{formatCurrency(group?.totals.extras || 0)}</td>
                     <td className="py-2 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
                     <td className="py-2 text-right font-bold">{formatCurrency(group?.totals.pending || 0)}</td>
                   </tr>
@@ -263,16 +277,14 @@ export default function PrintReport() {
 
         {/* INDIVIDUAL LOCATION PAGES */}
         {groupedData.map((group, index) => (
-          <div key={group?.location.id} className="max-w-[210mm] mx-auto bg-white print:max-w-none print:h-screen print:break-after-page flex flex-col relative pt-4 mb-16 print:mb-0">
+          <div key={group?.location.id} className="max-w-[297mm] mx-auto bg-white print:max-w-none print:h-[210mm] print:break-after-page flex flex-col relative pt-4 mb-16 print:mb-0 p-8 print:p-8">
             {/* Header */}
             <div className="flex justify-between items-start mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex items-center gap-3">
                 <Logo />
                 <div>
                   <h1 className="text-xl font-bold tracking-tight uppercase">Reporte de Pagos</h1>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                    Local: <span className="text-blue-600">{group?.location.name}</span>
-                  </p>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Docks del Puerto • {group?.location.name}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -281,66 +293,90 @@ export default function PrintReport() {
               </div>
             </div>
 
-            {/* Main Table */}
-            <table className="w-full text-xs border-collapse mb-8">
-              <thead>
-                <tr className="border-b-2 border-slate-900 bg-slate-50">
-                  <th className="text-left py-2 pl-2 font-bold uppercase w-1/3">Empleado / Rol</th>
-                  <th className="text-center py-2 font-bold uppercase">Días Trab.</th>
-                  <th className="text-right py-2 font-bold uppercase">Jornal</th>
-                  <th className="text-right py-2 font-bold uppercase">A Pagar</th>
-                  <th className="text-right py-2 font-bold uppercase">Pagado</th>
-                  <th className="text-right py-2 pr-2 font-bold uppercase">Saldo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {group?.employees.map((row) => (
-                  <tr key={row.employee.id} className="break-inside-avoid hover:bg-slate-50">
-                    <td className="py-2 pl-2">
-                      <div className="font-bold text-slate-900">{row.employee.name}</div>
-                      <div className="text-[9px] text-slate-500 uppercase tracking-wide">{row.employee.role}</div>
-                    </td>
-                    <td className="py-2 text-center font-medium">{row.daysWorked}</td>
-                    <td className="py-2 text-right text-slate-500">{formatCurrency(row.employee.dailyRate)}</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(row.totalEarned)}</td>
-                    <td className="py-2 text-right text-emerald-700">{formatCurrency(row.totalPaid)}</td>
-                    <td className={`py-2 pr-2 text-right font-bold ${row.pendingAmount > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {formatCurrency(row.pendingAmount)}
-                    </td>
+            {/* Table */}
+            <div className="flex-grow">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-900">
+                    <th className="text-left py-2 font-bold uppercase w-1/4">Empleado</th>
+                    <th className="text-right py-2 font-bold uppercase">Jornal</th>
+                    <th className="text-center py-2 font-bold uppercase">Días</th>
+                    <th className="text-right py-2 font-bold uppercase">A Pagar</th>
+                    <th className="text-right py-2 font-bold uppercase text-blue-600">Extras</th>
+                    <th className="text-right py-2 font-bold uppercase text-emerald-700">Pagado</th>
+                    <th className="text-right py-2 font-bold uppercase">Pendiente</th>
+                    <th className="text-center py-2 font-bold uppercase w-1/6">Firma</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-sm">
-                  <td className="py-3 pl-2">TOTAL {group?.location.name}</td>
-                  <td className="py-3 text-center">-</td>
-                  <td className="py-3 text-right">-</td>
-                  <td className="py-3 text-right">{formatCurrency(group?.totals.earned || 0)}</td>
-                  <td className="py-3 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
-                  <td className="py-3 pr-2 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {/* Signatures Area */}
-            <div className="mt-auto mb-8 grid grid-cols-2 gap-12 break-inside-avoid px-8">
-              <div className="border-t border-slate-400 pt-2 text-center">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Firma Responsable Local</p>
-              </div>
-              <div className="border-t border-slate-400 pt-2 text-center">
-                <p className="text-[10px] font-bold uppercase text-slate-500">Firma Gerencia / Admin</p>
-              </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {group?.employees.map((data) => (
+                    <tr key={data.employee.id} className="break-inside-avoid">
+                      <td className="py-3 font-medium">
+                        {data.employee.name}
+                        <span className="block text-[10px] text-slate-400 font-normal uppercase">{data.employee.role}</span>
+                      </td>
+                      <td className="py-3 text-right text-slate-500">{formatCurrency(data.employee.dailyRate)}</td>
+                      <td className="py-3 text-center font-bold">{data.daysWorked}</td>
+                      <td className="py-3 text-right font-medium">{formatCurrency(data.totalEarned)}</td>
+                      <td className="py-3 text-right text-blue-600 font-medium">
+                        {data.totalExtras > 0 ? formatCurrency(data.totalExtras) : '-'}
+                      </td>
+                      <td className="py-3 text-right text-emerald-700 font-bold">{formatCurrency(data.totalPaid)}</td>
+                      <td className="py-3 text-right font-bold text-slate-900">
+                        {data.pendingAmount > 0 ? formatCurrency(data.pendingAmount) : '-'}
+                      </td>
+                      <td className="py-3 border-b border-slate-100"></td>
+                    </tr>
+                  ))}
+                  {/* Totals Row */}
+                  <tr className="bg-slate-50 border-t-2 border-slate-900 font-bold print:bg-slate-50" style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+                    <td className="py-3 pl-2 uppercase text-[10px] tracking-wider">Totales {group?.location.name}</td>
+                    <td className="py-3"></td>
+                    <td className="py-3 text-center">{group?.employees.reduce((acc, curr) => acc + curr.daysWorked, 0)}</td>
+                    <td className="py-3 text-right">{formatCurrency(group?.totals.earned || 0)}</td>
+                    <td className="py-3 text-right text-blue-600">{formatCurrency(group?.totals.extras || 0)}</td>
+                    <td className="py-3 text-right text-emerald-700">{formatCurrency(group?.totals.paid || 0)}</td>
+                    <td className="py-3 text-right">{formatCurrency(group?.totals.pending || 0)}</td>
+                    <td className="py-3"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            {/* Footer */}
-            <div className="pt-2 border-t border-slate-100 text-center">
-              <p className="text-[8px] text-slate-400 uppercase tracking-widest">
-                Docks del Puerto • Control Operativo • {group?.location.name}
-              </p>
+            {/* Footer Signatures */}
+            <div className="mt-auto pt-12 pb-4 break-inside-avoid">
+              <div className="grid grid-cols-3 gap-8">
+                <div className="text-center">
+                  <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Firma Responsable</p>
+                </div>
+                <div className="text-center">
+                  <div className="border-t border-slate-300 w-3/4 mx-auto mb-2"></div>
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Firma Gerencia</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] text-slate-400 italic">
+                    Página {index + 1} de {groupedData.length}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         ))}
       </div>
+      
+      <style>{`
+        @media print {
+          @page { 
+            size: A4 landscape; 
+            margin: 0;
+          }
+          body { 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+          }
+        }
+      `}</style>
     </div>
   );
 }

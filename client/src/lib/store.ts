@@ -12,7 +12,7 @@ interface AppState {
   // Actions
   addAttendance: (record: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
   removeAttendance: (employeeId: string, date: string) => void;
-  markPaid: (employeeId: string, date: string, amount: number) => void;
+  markPaid: (employeeId: string, date: string, amount: number, extras?: number) => void;
   resetData: () => void;
   
   // Selectors
@@ -67,7 +67,7 @@ export const useStore = create<AppState>()(
         }));
       },
 
-      markPaid: (employeeId, date, amount) => {
+      markPaid: (employeeId, date, amount, extras = 0) => {
         set((state) => {
           // Check if already paid
           const exists = state.payments.some(
@@ -84,6 +84,7 @@ export const useStore = create<AppState>()(
                 employeeId,
                 date,
                 amount,
+                extras,
                 status: 'paid',
                 period: date.substring(0, 7), // YYYY-MM
                 timestamp: Date.now(),

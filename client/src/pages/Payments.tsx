@@ -6,15 +6,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
-import { CheckCircle2, Clock } from "lucide-react";
+import { CheckCircle2, Clock, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export default function Payments() {
   const { employees, locations, attendance, payments, markPaid } = useStore();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentDateISO().substring(0, 7));
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
+  
+  // Payment Dialog State
+  const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<{
+    employeeId: string;
+    date: string;
+    amount: number;
+    employeeName: string;
+  } | null>(null);
+  const [extrasAmount, setExtrasAmount] = useState("0");
 
   const processedData = useMemo(() => {
     return employees
@@ -35,14 +55,21 @@ export default function Payments() {
           p => p.employeeId === employee.id && p.period === selectedMonth
         );
 
-        const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
-        const pendingAmount = totalEarned - totalPaid;
+        const totalPaid = monthlyPayments.reduce((sum, p) => sum + p.amount + (p.extras || 0), 0);
+        const pendingAmount = totalEarned - totalPaid; // Note: Extras are on top, so they don't reduce pending base salary, but for simplicity we track total paid vs total earned base. 
+        // Actually, better logic: Pending = (Days * Rate) - (Paid Base). Extras are separate.
+        // But to keep it simple for now: Pending = (Days * Rate) - (Total Paid - Total Extras)
+        
+        const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
+        const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+        
+        const realPending = totalEarned - totalPaidBase;
 
         // Determine status
         let status = 'none';
         if (monthlyAttendance.length === 0) status = 'no_activity';
-        else if (pendingAmount <= 0) status = 'paid';
-        else if (totalPaid > 0) status = 'partial';
+        else if (realPending <= 0) status = 'paid';
+        else if (totalPaidBase > 0) status = 'partial';
         else status = 'pending';
 
         return {
@@ -53,7 +80,8 @@ export default function Payments() {
             daysWorked: monthlyAttendance.length,
             totalEarned,
             totalPaid,
-            pendingAmount,
+            totalExtras,
+            pendingAmount: realPending,
             status
           }
         };
@@ -73,8 +101,24 @@ export default function Payments() {
       });
   }, [employees, attendance, payments, selectedMonth, selectedLocation, paymentStatus]);
 
-  const handlePayDay = (employeeId: string, date: string, amount: number) => {
-    markPaid(employeeId, date, amount);
+  const handleOpenPayDialog = (employeeId: string, date: string, amount: number, employeeName: string) => {
+    setSelectedPayment({ employeeId, date, amount, employeeName });
+    setExtrasAmount("0");
+    setIsPayDialogOpen(true);
+  };
+
+  const handleConfirmPayment = () => {
+    if (selectedPayment) {
+      markPaid(
+        selectedPayment.employeeId, 
+        selectedPayment.date, 
+        selectedPayment.amount, 
+        Number(extrasAmount) || 0
+      );
+      setIsPayDialogOpen(false);
+      setSelectedPayment(null);
+      setExtrasAmount("0");
+    }
   };
 
   return (
@@ -154,6 +198,15 @@ export default function Payments() {
                         </p>
                       </div>
                       
+                      {summary.totalExtras > 0 && (
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Extras</p>
+                          <p className="font-bold text-blue-600">
+                            +{formatCurrency(summary.totalExtras)}
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="text-right">
                         <p className="text-xs text-slate-500 uppercase tracking-wider font-medium">Pendiente</p>
                         <p className={`font-bold ${summary.pendingAmount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -181,7 +234,8 @@ export default function Payments() {
                   {sortedAttendance.length > 0 ? (
                     <div className="divide-y divide-slate-100">
                       {sortedAttendance.map(record => {
-                        const isPaid = payments.some(p => p.date === record.date);
+                        const payment = payments.find(p => p.date === record.date);
+                        const isPaid = !!payment;
                         
                         return (
                           <div key={record.id} className="flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors">
@@ -196,14 +250,21 @@ export default function Payments() {
                               <span className="font-medium text-slate-900">{formatCurrency(employee.dailyRate)}</span>
                               
                               {isPaid ? (
-                                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex gap-1 items-center py-1 px-3">
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  Pagado
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  {payment.extras > 0 && (
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                      + {formatCurrency(payment.extras)} Extra
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex gap-1 items-center py-1 px-3">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Pagado
+                                  </Badge>
+                                </div>
                               ) : (
                                 <Button 
                                   size="sm" 
-                                  onClick={() => handlePayDay(employee.id, record.date, employee.dailyRate)}
+                                  onClick={() => handleOpenPayDialog(employee.id, record.date, employee.dailyRate, employee.name)}
                                   className="bg-blue-600 hover:bg-blue-700 text-white h-8"
                                 >
                                   Pagar
@@ -230,6 +291,45 @@ export default function Payments() {
             </div>
           )}
         </div>
+
+        {/* Payment Dialog */}
+        <Dialog open={isPayDialogOpen} onOpenChange={setIsPayDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Pago</DialogTitle>
+              <DialogDescription>
+                Confirmar pago para {selectedPayment?.employeeName} del día {selectedPayment && formatDate(selectedPayment.date)}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">Jornal</Label>
+                <div className="col-span-3 font-bold text-slate-900">
+                  {selectedPayment && formatCurrency(selectedPayment.amount)}
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="extras" className="text-right">Extras ($)</Label>
+                <Input
+                  id="extras"
+                  type="number"
+                  value={extrasAmount}
+                  onChange={(e) => setExtrasAmount(e.target.value)}
+                  className="col-span-3"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPayDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleConfirmPayment} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                Confirmar Pago
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

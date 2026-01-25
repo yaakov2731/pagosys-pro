@@ -27,6 +27,7 @@ export interface PaymentRecord {
   employeeId: string;
   date: string; // ISO YYYY-MM-DD
   amount: number;
+  extras: number; // Overtime or bonuses
   status: 'paid' | 'pending';
   period: string; // YYYY-MM
   timestamp: number;
