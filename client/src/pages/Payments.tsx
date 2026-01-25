@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
-import { CheckCircle2, Clock, Plus, Wallet, X } from "lucide-react";
+import { CheckCircle2, Clock, Plus, Wallet, X, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 
 export default function Payments() {
-  const { employees, locations, attendance, payments, advances, markPaid, addAdvance, removeAdvance } = useStore();
+  const { employees, locations, attendance, payments, advances, extras, markPaid, addAdvance, removeAdvance, addExtra, removeExtra } = useStore();
   const [selectedMonth, setSelectedMonth] = useState(getCurrentDateISO().substring(0, 7));
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
@@ -43,6 +43,16 @@ export default function Payments() {
   const [selectedEmployeeForAdvance, setSelectedEmployeeForAdvance] = useState<{id: string, name: string} | null>(null);
   const [advanceForm, setAdvanceForm] = useState({
     amount: "",
+    date: getCurrentDateISO(),
+    note: ""
+  });
+
+  // Extra Dialog State
+  const [isExtraDialogOpen, setIsExtraDialogOpen] = useState(false);
+  const [selectedEmployeeForExtra, setSelectedEmployeeForExtra] = useState<{id: string, name: string, dailyRate: number} | null>(null);
+  const [extraForm, setExtraForm] = useState({
+    amount: "",
+    hours: "",
     date: getCurrentDateISO(),
     note: ""
   });
@@ -71,19 +81,25 @@ export default function Payments() {
           a => a.employeeId === employee.id && a.period === selectedMonth
         );
 
+        // Get extras for this month
+        const monthlyExtras = extras.filter(
+          e => e.employeeId === employee.id && e.period === selectedMonth
+        );
+
         const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
-        const totalExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
+        const totalPaidExtras = monthlyPayments.reduce((sum, p) => sum + (p.extras || 0), 0);
         const totalAdvances = monthlyAdvances.reduce((sum, a) => sum + a.amount, 0);
+        const totalRegisteredExtras = monthlyExtras.reduce((sum, e) => sum + e.amount, 0);
         
-        const totalPaid = totalPaidBase + totalExtras;
+        const totalPaid = totalPaidBase + totalPaidExtras;
+        const totalExtras = totalPaidExtras + totalRegisteredExtras;
         
-        // Pending = Earned - PaidBase - Advances
-        // Note: Advances reduce the pending amount because they are pre-payments
-        const realPending = totalEarned - totalPaidBase - totalAdvances;
+        // Pending = Earned + RegisteredExtras - PaidBase - Advances
+        const realPending = totalEarned + totalRegisteredExtras - totalPaidBase - totalAdvances;
 
         // Determine status
         let status = 'none';
-        if (monthlyAttendance.length === 0) status = 'no_activity';
+        if (monthlyAttendance.length === 0 && monthlyExtras.length === 0) status = 'no_activity';
         else if (realPending <= 0) status = 'paid';
         else if (totalPaidBase > 0 || totalAdvances > 0) status = 'partial';
         else status = 'pending';
@@ -93,6 +109,7 @@ export default function Payments() {
           attendance: monthlyAttendance,
           payments: monthlyPayments,
           advances: monthlyAdvances,
+          extras: monthlyExtras,
           summary: {
             daysWorked: monthlyAttendance.length,
             totalEarned,
@@ -117,7 +134,7 @@ export default function Payments() {
         }
         return a.employee.name.localeCompare(b.employee.name);
       });
-  }, [employees, attendance, payments, advances, selectedMonth, selectedLocation, paymentStatus]);
+  }, [employees, attendance, payments, advances, extras, selectedMonth, selectedLocation, paymentStatus]);
 
   const handleOpenPayDialog = (employeeId: string, date: string, amount: number, employeeName: string) => {
     setSelectedPayment({ employeeId, date, amount, employeeName });
@@ -174,6 +191,41 @@ export default function Payments() {
     setIsAdvanceDialogOpen(false);
   };
 
+  const handleOpenExtraDialog = (employee: {id: string, name: string, dailyRate: number}) => {
+    setSelectedEmployeeForExtra(employee);
+    setExtraForm({
+      amount: "",
+      hours: "",
+      date: getCurrentDateISO(),
+      note: ""
+    });
+    setIsExtraDialogOpen(true);
+  };
+
+  const calculateExtraAmount = (hours: string) => {
+    setExtraForm(prev => ({ ...prev, hours }));
+    if (!selectedEmployeeForExtra || !hours) return;
+    
+    const hourlyRate = selectedEmployeeForExtra.dailyRate / 8;
+    const amount = Math.round(hourlyRate * Number(hours));
+    setExtraForm(prev => ({ ...prev, amount: amount.toString() }));
+  };
+
+  const handleSaveExtra = () => {
+    if (!selectedEmployeeForExtra || !extraForm.amount) return;
+
+    addExtra(
+      selectedEmployeeForExtra.id,
+      Number(extraForm.amount),
+      extraForm.date,
+      Number(extraForm.hours) || undefined,
+      extraForm.note
+    );
+
+    toast.success("Hora extra registrada correctamente");
+    setIsExtraDialogOpen(false);
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -217,7 +269,7 @@ export default function Payments() {
         </div>
 
         <div className="space-y-6">
-          {processedData.map(({ employee, attendance, payments, advances, summary }) => {
+          {processedData.map(({ employee, attendance, payments, advances, extras, summary }) => {
             // Group attendance by date to show history
             const sortedAttendance = [...attendance].sort((a, b) => b.date.localeCompare(a.date));
             
@@ -281,6 +333,15 @@ export default function Payments() {
                           variant="outline" 
                           size="sm"
                           className="h-8 gap-1 text-slate-600"
+                          onClick={() => handleOpenExtraDialog(employee)}
+                        >
+                          <Zap className="w-3 h-3" />
+                          Extra
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-8 gap-1 text-slate-600"
                           onClick={() => handleOpenAdvanceDialog(employee)}
                         >
                           <Wallet className="w-3 h-3" />
@@ -304,6 +365,33 @@ export default function Payments() {
                 </CardHeader>
                 
                 <CardContent className="p-0">
+                  {/* Extras Section */}
+                  {extras.length > 0 && (
+                    <div className="bg-blue-50/30 border-b border-slate-100 px-4 py-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase mb-2">Extras Registrados</p>
+                      <div className="space-y-1">
+                        {extras.map(extra => (
+                          <div key={extra.id} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-700 font-medium">{formatDate(extra.date)}</span>
+                              {extra.hours && <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-white">{extra.hours}hs</Badge>}
+                              {extra.note && <span className="text-slate-500 italic">- {extra.note}</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-blue-600">+{formatCurrency(extra.amount)}</span>
+                              <button 
+                                onClick={() => removeExtra(extra.id)}
+                                className="text-slate-400 hover:text-red-500"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Advances Section */}
                   {advances.length > 0 && (
                     <div className="bg-red-50/30 border-b border-slate-100 px-4 py-2">
@@ -527,6 +615,78 @@ export default function Payments() {
               <Button variant="outline" onClick={() => setIsAdvanceDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleSaveAdvance} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Guardar Adelanto
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Extra Dialog */}
+        <Dialog open={isExtraDialogOpen} onOpenChange={setIsExtraDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Registrar Hora Extra</DialogTitle>
+              <DialogDescription>
+                Agregar horas extras para {selectedEmployeeForExtra?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="extraHours">Cantidad de Horas</Label>
+                <div className="relative">
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="extraHours"
+                    type="number"
+                    className="pl-9"
+                    value={extraForm.hours}
+                    onChange={(e) => calculateExtraAmount(e.target.value)}
+                    placeholder="Cant. Horas"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500">Calcula automáticamente basado en el jornal.</p>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="extraAmount">Monto ($)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <Input
+                    id="extraAmount"
+                    type="number"
+                    className="pl-7"
+                    value={extraForm.amount}
+                    onChange={(e) => setExtraForm({ ...extraForm, amount: e.target.value })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="extraDate">Fecha</Label>
+                <Input
+                  id="extraDate"
+                  type="date"
+                  value={extraForm.date}
+                  onChange={(e) => setExtraForm({ ...extraForm, date: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="extraNote">Nota (Opcional)</Label>
+                <Input
+                  id="extraNote"
+                  value={extraForm.note}
+                  onChange={(e) => setExtraForm({ ...extraForm, note: e.target.value })}
+                  placeholder="Ej: Se quedó limpiando"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsExtraDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveExtra} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Guardar Extra
               </Button>
             </DialogFooter>
           </DialogContent>

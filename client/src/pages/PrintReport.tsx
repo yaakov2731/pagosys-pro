@@ -145,10 +145,20 @@ export default function PrintReport() {
       
       text += `DETALLE POR EMPLEADO:\n`;
       group.employees.forEach(d => {
+        // Get worked days
+        const monthlyAttendance = attendance.filter(
+          r => r.employeeId === d.employee.id && 
+          r.date.startsWith(month) && 
+          r.status === 'present'
+        ).sort((a, b) => a.date.localeCompare(b.date));
+        
+        const daysList = monthlyAttendance.map(r => r.date.substring(8, 10)).join(', ');
+
         text += `- ${d.employee.name}: ${formatCurrency(d.totalPaid)} pagado`;
         if (d.totalAdvances > 0) text += ` [Adelantos: -${formatCurrency(d.totalAdvances)}]`;
         if (d.pendingAmount > 0) text += ` (Pendiente: ${formatCurrency(d.pendingAmount)})`;
         if (d.totalExtras > 0) text += ` [Incluye ${formatCurrency(d.totalExtras)} extras]`;
+        if (daysList) text += `\n  Días: ${daysList}`;
         text += `\n`;
       });
       text += `\n----------------------------------------\n\n`;
