@@ -45,30 +45,37 @@ export function getCurrentDateISO(): string {
 import { AttendanceRecord } from "./data";
 
 export function checkConsecutiveAbsences(
-  employeeId: string, 
-  attendance: AttendanceRecord[], 
+  employeeId: string,
+  attendance: AttendanceRecord[],
   threshold: number = 3
 ): boolean {
-  // Get all records for this employee, sorted by date descending
-  const employeeRecords = attendance
-    .filter(r => r.employeeId === employeeId)
+  // Get all absence records for this employee, sorted by date descending
+  const absenceRecords = attendance
+    .filter(r => r.employeeId === employeeId && r.status === 'absent')
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-  if (employeeRecords.length < threshold) return false;
+  if (absenceRecords.length < threshold) return false;
 
-  // Check the most recent 'threshold' records
-  let consecutiveAbsences = 0;
-  
-  // We need to check consecutive DAYS, not just records
-  // But for simplicity in this version, we'll check consecutive 'absent' records
-  // Assuming daily records are generated or we only care about recorded absences
-  
-  for (let i = 0; i < employeeRecords.length; i++) {
-    if (employeeRecords[i].status === 'absent') {
+  // Check if the most recent absences are on consecutive calendar days
+  let consecutiveAbsences = 1; // Start with the most recent absence
+
+  for (let i = 0; i < absenceRecords.length - 1; i++) {
+    const currentDate = new Date(absenceRecords[i].date);
+    const nextDate = new Date(absenceRecords[i + 1].date);
+
+    // Calculate the difference in days
+    const diffTime = currentDate.getTime() - nextDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    // If exactly 1 day apart, they are consecutive
+    if (diffDays === 1) {
       consecutiveAbsences++;
+      if (consecutiveAbsences >= threshold) {
+        return true;
+      }
     } else {
-      // Break if we find a present record
-      break;
+      // Not consecutive, reset counter and continue checking from this point
+      consecutiveAbsences = 1;
     }
   }
 
