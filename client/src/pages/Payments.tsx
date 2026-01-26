@@ -160,10 +160,19 @@ export default function Payments() {
 
   const calculateOvertime = (hours: string) => {
     setOvertimeHours(hours);
-    if (!selectedPayment || !hours) return;
-    
+    if (!selectedPayment || !hours) {
+      setExtrasAmount("0");
+      return;
+    }
+
+    const hoursNum = Number(hours);
+    if (isNaN(hoursNum) || hoursNum < 0) {
+      setExtrasAmount("0");
+      return;
+    }
+
     const hourlyRate = selectedPayment.amount / 8; // Assuming 8 hour workday
-    const overtimeValue = Math.round(hourlyRate * Number(hours));
+    const overtimeValue = Math.round(hourlyRate * hoursNum);
     setExtrasAmount(overtimeValue.toString());
   };
 
@@ -180,9 +189,15 @@ export default function Payments() {
   const handleSaveAdvance = () => {
     if (!selectedEmployeeForAdvance || !advanceForm.amount) return;
 
+    const amount = Number(advanceForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Ingrese un monto válido mayor a 0");
+      return;
+    }
+
     addAdvance(
       selectedEmployeeForAdvance.id,
-      Number(advanceForm.amount),
+      amount,
       advanceForm.date,
       advanceForm.note
     );
@@ -204,21 +219,42 @@ export default function Payments() {
 
   const calculateExtraAmount = (hours: string) => {
     setExtraForm(prev => ({ ...prev, hours }));
-    if (!selectedEmployeeForExtra || !hours) return;
-    
+    if (!selectedEmployeeForExtra || !hours) {
+      setExtraForm(prev => ({ ...prev, amount: "" }));
+      return;
+    }
+
+    const hoursNum = Number(hours);
+    if (isNaN(hoursNum) || hoursNum < 0) {
+      setExtraForm(prev => ({ ...prev, amount: "" }));
+      return;
+    }
+
     const hourlyRate = selectedEmployeeForExtra.dailyRate / 8;
-    const amount = Math.round(hourlyRate * Number(hours));
+    const amount = Math.round(hourlyRate * hoursNum);
     setExtraForm(prev => ({ ...prev, amount: amount.toString() }));
   };
 
   const handleSaveExtra = () => {
     if (!selectedEmployeeForExtra || !extraForm.amount) return;
 
+    const amount = Number(extraForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Ingrese un monto válido mayor a 0");
+      return;
+    }
+
+    const hours = extraForm.hours ? Number(extraForm.hours) : undefined;
+    if (hours !== undefined && (isNaN(hours) || hours < 0)) {
+      toast.error("Ingrese una cantidad de horas válida");
+      return;
+    }
+
     addExtra(
       selectedEmployeeForExtra.id,
-      Number(extraForm.amount),
+      amount,
       extraForm.date,
-      Number(extraForm.hours) || undefined,
+      hours,
       extraForm.note
     );
 
@@ -227,6 +263,15 @@ export default function Payments() {
   };
 
   const handleExportCSV = () => {
+    // Helper function to escape CSV values (handle commas, quotes, newlines)
+    const escapeCSV = (value: string | number): string => {
+      const str = String(value);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
     // Header row
     const headers = [
       "Empleado",
@@ -244,8 +289,8 @@ export default function Payments() {
     const rows = processedData.map(({ employee, summary }) => {
       const locationName = locations.find(l => l.id === employee.locationId)?.name || "Desconocido";
       return [
-        employee.name,
-        locationName,
+        escapeCSV(employee.name),
+        escapeCSV(locationName),
         summary.daysWorked,
         summary.totalEarned,
         summary.totalExtras,
