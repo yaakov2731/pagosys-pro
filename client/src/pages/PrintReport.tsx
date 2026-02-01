@@ -26,7 +26,11 @@ export default function PrintReport() {
   
   // Extract params from URL
   const searchParams = new URLSearchParams(window.location.search);
-  const month = searchParams.get("month") || getCurrentDateISO().substring(0, 7);
+  const currentDate = getCurrentDateISO();
+  const currentYear = currentDate.substring(0, 4);
+  const currentMonth = currentDate.substring(5, 7);
+  const startDate = searchParams.get("startDate") || `${currentYear}-${currentMonth}-01`;
+  const endDate = searchParams.get("endDate") || currentDate;
   const locationId = searchParams.get("location") || "all";
 
   // Filter employees based on selection
@@ -34,36 +38,36 @@ export default function PrintReport() {
     .filter(e => e.active && (locationId === "all" || e.locationId === locationId))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Calculate dynamic date range
-  const allDates = attendance
-    .filter(r => r.date.startsWith(month) && r.status === 'present')
-    .map(r => r.date)
-    .sort();
-  
-  const startDate = allDates.length > 0 ? formatDate(allDates[0]) : formatDate(`${month}-01`);
-  const endDate = formatDate(getCurrentDateISO());
-  const periodString = `${startDate} - ${endDate}`;
+  // Calculate period string for display
+  const periodString = `${formatDate(startDate)} - ${formatDate(endDate)}`;
 
   // Process data per employee
   const employeeData = activeEmployees.map(employee => {
     const monthlyAttendance = attendance.filter(
       r => r.employeeId === employee.id && 
-      r.date.startsWith(month) && 
+      r.date >= startDate &&
+      r.date <= endDate &&
       r.status === 'present'
     );
 
     const totalEarned = monthlyAttendance.length * employee.dailyRate;
     
     const monthlyPayments = payments.filter(
-      p => p.employeeId === employee.id && p.period === month
+      p => p.employeeId === employee.id && 
+      p.date >= startDate &&
+      p.date <= endDate
     );
 
     const monthlyAdvances = advances.filter(
-      a => a.employeeId === employee.id && a.period === month
+      a => a.employeeId === employee.id && 
+      a.date >= startDate &&
+      a.date <= endDate
     );
 
     const monthlyExtras = extras.filter(
-      e => e.employeeId === employee.id && e.period === month
+      e => e.employeeId === employee.id && 
+      e.date >= startDate &&
+      e.date <= endDate
     );
 
     const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -155,7 +159,8 @@ export default function PrintReport() {
         // Get worked days
         const monthlyAttendance = attendance.filter(
           r => r.employeeId === d.employee.id && 
-          r.date.startsWith(month) && 
+          r.date >= startDate &&
+          r.date <= endDate &&
           r.status === 'present'
         ).sort((a, b) => a.date.localeCompare(b.date));
         
