@@ -20,10 +20,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import DateRangePicker from "@/components/DateRangePicker";
 
 export default function Payments() {
   const { employees, locations, attendance, payments, advances, extras, markPaid, addAdvance, removeAdvance, addExtra, removeExtra } = useStore();
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentDateISO().substring(0, 7));
+  // Date range state (default: current month)
+  const currentDate = getCurrentDateISO();
+  const currentYear = currentDate.substring(0, 4);
+  const currentMonth = currentDate.substring(5, 7);
+  const [startDate, setStartDate] = useState(`${currentYear}-${currentMonth}-01`);
+  const [endDate, setEndDate] = useState(currentDate);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
   
@@ -61,29 +67,36 @@ export default function Payments() {
     return employees
       .filter(e => e.active && (selectedLocation === "all" || e.locationId === selectedLocation))
       .map(employee => {
-        // Get attendance for this month
+        // Get attendance for date range
         const monthlyAttendance = attendance.filter(
           r => r.employeeId === employee.id && 
-          r.date.startsWith(selectedMonth) && 
+          r.date >= startDate &&
+          r.date <= endDate &&
           r.status === 'present'
         );
 
         // Calculate total earned
         const totalEarned = monthlyAttendance.length * employee.dailyRate;
 
-        // Get payments for this month
+        // Get payments for date range
         const monthlyPayments = payments.filter(
-          p => p.employeeId === employee.id && p.period === selectedMonth
+          p => p.employeeId === employee.id && 
+          p.date >= startDate &&
+          p.date <= endDate
         );
 
-        // Get advances for this month
+        // Get advances for date range
         const monthlyAdvances = advances.filter(
-          a => a.employeeId === employee.id && a.period === selectedMonth
+          a => a.employeeId === employee.id && 
+          a.date >= startDate &&
+          a.date <= endDate
         );
 
-        // Get extras for this month
+        // Get extras for date range
         const monthlyExtras = extras.filter(
-          e => e.employeeId === employee.id && e.period === selectedMonth
+          e => e.employeeId === employee.id && 
+          e.date >= startDate &&
+          e.date <= endDate
         );
 
         const totalPaidBase = monthlyPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -134,7 +147,7 @@ export default function Payments() {
         }
         return a.employee.name.localeCompare(b.employee.name);
       });
-  }, [employees, attendance, payments, advances, extras, selectedMonth, selectedLocation, paymentStatus]);
+  }, [employees, attendance, payments, advances, extras, startDate, endDate, selectedLocation, paymentStatus]);
 
   const handleOpenPayDialog = (employeeId: string, date: string, amount: number, employeeName: string) => {
     setSelectedPayment({ employeeId, date, amount, employeeName });
@@ -312,7 +325,7 @@ export default function Payments() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `pagos_${selectedMonth}.csv`);
+    link.setAttribute("download", `pagos_${startDate}_${endDate}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -329,14 +342,13 @@ export default function Payments() {
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="w-full sm:w-48">
-              <Input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-white"
-              />
-            </div>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={setStartDate}
+              onEndDateChange={setEndDate}
+              className="w-full sm:w-96"
+            />
             <Select value={selectedLocation} onValueChange={setSelectedLocation}>
               <SelectTrigger className="w-full sm:w-48 bg-white">
                 <SelectValue placeholder="Filtrar por local" />

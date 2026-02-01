@@ -6,27 +6,37 @@ import { formatCurrency, getCurrentDateISO } from "@/lib/utils";
 import { BarChart, PieChart, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, Cell, Legend, Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import DateRangePicker from "@/components/DateRangePicker";
 
 export default function Reports() {
   const { employees, locations, attendance, payments, extras } = useStore();
-  const currentMonth = getCurrentDateISO().substring(0, 7);
+  
+  // Date range state (default: current month)
+  const currentDate = getCurrentDateISO();
+  const currentYear = currentDate.substring(0, 4);
+  const currentMonth = currentDate.substring(5, 7);
+  const [startDate, setStartDate] = useState(`${currentYear}-${currentMonth}-01`);
+  const [endDate, setEndDate] = useState(currentDate);
 
   const costsByLocation = useMemo(() => {
     return locations.filter(l => l.active).map(location => {
       const locationEmployees = employees.filter(e => e.locationId === location.id);
       
-      // Calculate total cost for this month (based on attendance + extras)
+      // Calculate total cost for date range (based on attendance + extras)
       const totalCost = locationEmployees.reduce((sum, emp) => {
         const daysWorked = attendance.filter(
           r => r.employeeId === emp.id && 
-          r.date.startsWith(currentMonth) && 
+          r.date >= startDate &&
+          r.date <= endDate &&
           r.status === 'present'
         ).length;
         
         const employeeExtras = extras.filter(
-          e => e.employeeId === emp.id && e.period === currentMonth
+          e => e.employeeId === emp.id && 
+          e.date >= startDate &&
+          e.date <= endDate
         ).reduce((acc, curr) => acc + curr.amount, 0);
 
         return sum + (daysWorked * emp.dailyRate) + employeeExtras;
@@ -37,7 +47,7 @@ export default function Reports() {
         cost: totalCost
       };
     }).sort((a, b) => b.cost - a.cost);
-  }, [employees, locations, attendance, currentMonth]);
+  }, [employees, locations, attendance, extras, startDate, endDate]);
 
   const attendanceByLocation = useMemo(() => {
     return locations.filter(l => l.active).map(location => {
@@ -47,7 +57,8 @@ export default function Reports() {
       const presentDays = locationEmployees.reduce((sum, emp) => {
         return sum + attendance.filter(
           r => r.employeeId === emp.id && 
-          r.date.startsWith(currentMonth) && 
+          r.date >= startDate &&
+          r.date <= endDate &&
           r.status === 'present'
         ).length;
       }, 0);
@@ -58,7 +69,7 @@ export default function Reports() {
         total: totalDays
       };
     });
-  }, [employees, locations, attendance, currentMonth]);
+  }, [employees, locations, attendance, extras, startDate, endDate]);
 
   const COLORS = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#9333ea', '#0891b2'];
 
@@ -66,17 +77,26 @@ export default function Reports() {
     <Layout>
       <div className="space-y-8">
         <div>
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-slate-900">Reportes</h1>
-              <p className="text-slate-500 mt-2">Análisis de costos y asistencia del mes actual ({currentMonth}).</p>
+              <p className="text-slate-500 mt-2">Análisis de costos y asistencia.</p>
             </div>
-            <Link href={`/print-report?month=${currentMonth}`}>
-              <Button className="bg-slate-900 text-white hover:bg-slate-800">
-                <Printer className="w-4 h-4 mr-2" />
-                Imprimir Reporte A4
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onStartDateChange={setStartDate}
+                onEndDateChange={setEndDate}
+                className="w-full sm:w-96"
+              />
+              <Link href={`/print-report?startDate=${startDate}&endDate=${endDate}`}>
+                <Button className="bg-slate-900 text-white hover:bg-slate-800">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir Reporte A4
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
