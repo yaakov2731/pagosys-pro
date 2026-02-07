@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, checkConsecutiveAbsences } from "@/lib/utils";
-import { AlertTriangle, Pencil } from "lucide-react";
+import { AlertTriangle, Pencil, Plus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, User } from "lucide-react";
 import { useState } from "react";
@@ -24,9 +24,19 @@ import { toast } from "sonner";
 import { Employee } from "@/lib/data";
 
 export default function Employees() {
-  const { employees, locations, attendance, updateEmployee } = useStore();
+  const { employees, locations, attendance, addEmployee, updateEmployee } = useStore();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  
+  // Add Dialog State
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: "",
+    role: "",
+    locationId: "",
+    dailyRate: "",
+    active: true
+  });
   
   // Edit Dialog State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -54,6 +64,31 @@ export default function Employees() {
     setIsEditDialogOpen(true);
   };
 
+  const handleAddEmployee = () => {
+    if (!addForm.name || !addForm.role || !addForm.locationId || !addForm.dailyRate) {
+      toast.error("Por favor completá todos los campos");
+      return;
+    }
+
+    addEmployee({
+      name: addForm.name,
+      role: addForm.role,
+      locationId: addForm.locationId,
+      dailyRate: Number(addForm.dailyRate),
+      active: addForm.active
+    });
+
+    toast.success("Empleado agregado correctamente");
+    setIsAddDialogOpen(false);
+    setAddForm({
+      name: "",
+      role: "",
+      locationId: "",
+      dailyRate: "",
+      active: true
+    });
+  };
+
   const handleSaveEdit = () => {
     if (!editingEmployee) return;
 
@@ -70,10 +105,20 @@ export default function Employees() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Empleados</h1>
-            <p className="text-slate-500 mt-2">Directorio de personal y roles.</p>
+        <div className="space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Empleados</h1>
+              <p className="text-slate-500 mt-2">Directorio de personal y roles.</p>
+            </div>
+            
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Empleado
+            </Button>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3">
@@ -163,6 +208,95 @@ export default function Employees() {
             <p className="text-slate-500">No se encontraron empleados.</p>
           </div>
         )}
+
+        {/* Add Employee Dialog */}
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Agregar Nuevo Empleado</DialogTitle>
+              <DialogDescription>
+                Completá los datos del nuevo empleado
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Nombre Completo</Label>
+                <Input
+                  id="name"
+                  placeholder="Ej: Juan Pérez"
+                  value={addForm.name}
+                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="add-role">Rol / Puesto</Label>
+                <Input
+                  id="add-role"
+                  placeholder="Ej: Cocinero, Cajera, etc."
+                  value={addForm.role}
+                  onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="location">Local</Label>
+                <Select value={addForm.locationId} onValueChange={(value) => setAddForm({ ...addForm, locationId: value })}>
+                  <SelectTrigger id="location">
+                    <SelectValue placeholder="Seleccioná un local" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.filter(l => l.active).map(l => (
+                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="add-dailyRate">Jornal Diario ($)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                  <Input
+                    id="add-dailyRate"
+                    type="number"
+                    className="pl-7"
+                    placeholder="0"
+                    value={addForm.dailyRate}
+                    onChange={(e) => setAddForm({ ...addForm, dailyRate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Estado Inicial</Label>
+                  <p className="text-xs text-slate-500">
+                    El empleado estará activo por defecto
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button 
+                    variant={addForm.active ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setAddForm({ ...addForm, active: !addForm.active })}
+                    className={addForm.active ? "bg-emerald-600 hover:bg-emerald-700" : "text-slate-500"}
+                  >
+                    {addForm.active ? "Activo" : "Inactivo"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={handleAddEmployee} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Agregar Empleado
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Employee Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

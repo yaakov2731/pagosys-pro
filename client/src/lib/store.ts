@@ -12,6 +12,7 @@ interface AppState {
   extras: ExtraRecord[];
   
   // Actions
+  addEmployee: (employee: Omit<Employee, 'id'>) => void;
   updateEmployee: (id: string, data: Partial<Employee>) => void;
   toggleLocation: (locationId: string) => void;
   addAttendance: (record: Omit<AttendanceRecord, 'id' | 'timestamp'>) => void;
@@ -39,6 +40,18 @@ export const useStore = create<AppState>()(
       payments: [],
       advances: [],
       extras: [],
+
+      addEmployee: (employee) => {
+        set((state) => ({
+          employees: [
+            ...state.employees,
+            {
+              ...employee,
+              id: crypto.randomUUID(),
+            },
+          ],
+        }));
+      },
 
       updateEmployee: (id, data) => {
         set((state) => ({
