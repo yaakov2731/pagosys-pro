@@ -23,6 +23,7 @@ interface AppState {
   addExtra: (employeeId: string, amount: number, date: string, hours?: number, note?: string) => void;
   removeExtra: (id: string) => void;
   resetData: () => void;
+  clearOldAttendance: (beforeDate: string) => void;
   
   // Selectors
   getEmployeeAttendance: (employeeId: string, month: string) => AttendanceRecord[];
@@ -184,6 +185,12 @@ export const useStore = create<AppState>()(
 
       resetData: () => {
         set({ attendance: [], payments: [], advances: [], extras: [] });
+      },
+
+      clearOldAttendance: (beforeDate) => {
+        set((state) => ({
+          attendance: state.attendance.filter((r) => r.date >= beforeDate),
+        }));
       },
 
       getEmployeeAttendance: (employeeId: string, month: string) => {

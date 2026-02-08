@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/lib/store";
 import { formatCurrency, formatDate, getCurrentDateISO } from "@/lib/utils";
-import { CheckCircle2, Clock, Download, Plus, Wallet, X, Zap } from "lucide-react";
+import { CheckCircle2, Clock, Download, Plus, Wallet, X, Zap, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import DateRangePicker from "@/components/DateRangePicker";
 
 export default function Payments() {
-  const { employees, locations, attendance, payments, advances, extras, markPaid, addAdvance, removeAdvance, addExtra, removeExtra } = useStore();
+  const { employees, locations, attendance, payments, advances, extras, markPaid, addAdvance, removeAdvance, addExtra, removeExtra, clearOldAttendance } = useStore();
   // Date range state (default: current month)
   const currentDate = getCurrentDateISO();
   const currentYear = currentDate.substring(0, 4);
@@ -32,6 +32,8 @@ export default function Payments() {
   const [endDate, setEndDate] = useState(currentDate);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [paymentStatus, setPaymentStatus] = useState<string>("all");
+  const [isCleanDialogOpen, setIsCleanDialogOpen] = useState(false);
+  const [cleanBeforeDate, setCleanBeforeDate] = useState(startDate);
   
   // Payment Dialog State
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
@@ -275,6 +277,24 @@ export default function Payments() {
     setIsExtraDialogOpen(false);
   };
 
+  const handleCleanOldAttendance = () => {
+    if (!cleanBeforeDate) {
+      toast.error("Seleccion\u00e1 una fecha");
+      return;
+    }
+
+    const count = attendance.filter(r => r.date < cleanBeforeDate).length;
+    if (count === 0) {
+      toast.info("No hay asistencias anteriores a esa fecha");
+      setIsCleanDialogOpen(false);
+      return;
+    }
+
+    clearOldAttendance(cleanBeforeDate);
+    toast.success(`${count} registro(s) de asistencia eliminados`);
+    setIsCleanDialogOpen(false);
+  };
+
   const handleExportCSV = () => {
     // Helper function to escape CSV values (handle commas, quotes, newlines)
     const escapeCSV = (value: string | number): string => {
@@ -372,6 +392,18 @@ export default function Payments() {
             </Select>
             <Button variant="outline" size="icon" onClick={handleExportCSV} title="Exportar a CSV">
               <Download className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => {
+                setCleanBeforeDate(startDate);
+                setIsCleanDialogOpen(true);
+              }} 
+              title="Limpiar asistencias viejas"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
           </div>
         </div>
@@ -795,6 +827,49 @@ export default function Payments() {
               <Button variant="outline" onClick={() => setIsExtraDialogOpen(false)}>Cancelar</Button>
               <Button onClick={handleSaveExtra} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Guardar Extra
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Clean Old Attendance Dialog */}
+        <Dialog open={isCleanDialogOpen} onOpenChange={setIsCleanDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Limpiar Asistencias Viejas</DialogTitle>
+              <DialogDescription>
+                Eliminar registros de asistencia anteriores a una fecha espec\u00edfica.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="cleanBeforeDate">Eliminar asistencias anteriores a:</Label>
+                <Input
+                  id="cleanBeforeDate"
+                  type="date"
+                  value={cleanBeforeDate}
+                  onChange={(e) => setCleanBeforeDate(e.target.value)}
+                />
+                <p className="text-xs text-slate-500">
+                  Se eliminar\u00e1n {attendance.filter(r => r.date < cleanBeforeDate).length} registro(s) de asistencia.
+                </p>
+              </div>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800">
+                  <strong>Advertencia:</strong> Esta acci\u00f3n no se puede deshacer. Solo elimina registros de asistencia, no pagos ni adelantos.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCleanDialogOpen(false)}>Cancelar</Button>
+              <Button 
+                onClick={handleCleanOldAttendance} 
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Limpiar Asistencias
               </Button>
             </DialogFooter>
           </DialogContent>
