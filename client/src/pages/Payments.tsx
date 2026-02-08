@@ -109,8 +109,8 @@ export default function Payments() {
         const totalPaid = totalPaidBase + totalPaidExtras;
         const totalExtras = totalPaidExtras + totalRegisteredExtras;
         
-        // Pending = Earned + RegisteredExtras - PaidBase - Advances
-        const realPending = totalEarned + totalRegisteredExtras - totalPaidBase - totalAdvances;
+        // Pending = Earned + RegisteredExtras - PaidBase - PaidExtras - Advances
+        const realPending = totalEarned + totalRegisteredExtras - totalPaidBase - totalPaidExtras - totalAdvances;
 
         // Determine status
         let status = 'none';
